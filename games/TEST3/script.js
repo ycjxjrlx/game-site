@@ -144,8 +144,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // 调整画布大小
     function resizeCanvas() {
         if (gameMode === 'chess') {
-            // 象棋棋盘大小
-            cellSize = 50; // 增大单元格大小
+            // 象棋棋盘大小，确保在移动设备上显示足够大
+            const maxWidth = Math.min(window.innerWidth - 40, 800);
+            const containerWidth = document.querySelector('.board-container').clientWidth;
+            const availableWidth = Math.min(maxWidth, containerWidth);
+            
+            // 根据可用宽度计算单元格大小，确保移动设备上棋盘足够大
+            cellSize = Math.max(30, Math.floor(availableWidth / 11)); // 9格+2个边距
             
             // 计算棋盘实际宽度和高度
             const boardWidth = (boardSize.width - 1) * cellSize;
@@ -163,10 +168,17 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log("单元格大小：", cellSize, "像素");
         } else {
             // 围棋/五子棋棋盘大小...（保持不变）
+            const maxWidth = Math.min(window.innerWidth - 40, 800);
+            const containerWidth = document.querySelector('.board-container').clientWidth;
+            const availableWidth = Math.min(maxWidth, containerWidth);
+            
+            // 根据可用宽度和棋盘大小计算合适的单元格大小
+            const maxCellSize = Math.floor((availableWidth - 40) / boardSize);
+            
             if (boardSize > 13) {
-                cellSize = 30;
+                cellSize = Math.max(20, Math.min(30, maxCellSize));
             } else {
-                cellSize = 35;
+                cellSize = Math.max(25, Math.min(35, maxCellSize));
             }
             
             stoneRadius = cellSize * 0.4;
@@ -174,6 +186,9 @@ document.addEventListener('DOMContentLoaded', () => {
             
             canvas.width = boardSize * cellSize + padding * 2;
             canvas.height = boardSize * cellSize + padding * 2;
+            
+            console.log("围棋/五子棋画布尺寸：", canvas.width, "x", canvas.height, "像素");
+            console.log("单元格大小：", cellSize, "像素");
         }
         
         drawBoard();
@@ -734,13 +749,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // 获取鼠标点击在棋盘上的位置
     function getBoardPosition(clientX, clientY) {
         const rect = canvas.getBoundingClientRect();
-        const x = clientX - rect.left;
-        const y = clientY - rect.top;
+        // 修复：使用正确的坐标换算，包括考虑设备像素比
+        const scale = window.devicePixelRatio || 1;
+        const x = (clientX - rect.left) * (canvas.width / rect.width / scale);
+        const y = (clientY - rect.top) * (canvas.height / rect.height / scale);
         
         // 增加调试信息，帮助排查问题
         console.log("点击/触摸位置:", {clientX, clientY});
-        console.log("画布位置:", {left: rect.left, top: rect.top});
-        console.log("相对坐标:", {x, y});
+        console.log("画布位置:", {left: rect.left, top: rect.top, width: rect.width, height: rect.height});
+        console.log("相对坐标:", {x, y, scale: scale});
         
         if (gameMode === 'chess') {
             // 计算棋盘的位置
@@ -1501,27 +1518,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 事件监听
-    // 鼠标点击事件处理
-    canvas.addEventListener('click', (e) => {
-        const pos = getBoardPosition(e.clientX, e.clientY);
-        if (!pos) return;
-        
-        if (gameMode === 'go') {
-            placeGoStone(pos.x, pos.y);
-        } else if (gameMode === 'gomoku') {
-            placeGomokuStone(pos.x, pos.y);
-        } else if (gameMode === 'chess') {
-            handleChessClick(pos.x, pos.y);
-        }
-    });
+    // 添加移动端的缩放功能
+    let initialPinchDistance = 0;
+    let currentScale = 1;
+    const MAX_SCALE = 3;
+    const MIN_SCALE = 0.5;
     
-    // 添加触摸事件支持，解决移动设备上的问题
+    function getDistance(touch1, touch2) {
+        const dx = touch1.clientX - touch2.clientX;
+        const dy = touch1.clientY - touch2.clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+    
     canvas.addEventListener('touchstart', (e) => {
-        // 防止触摸事件触发后又触发点击事件
-        e.preventDefault();
+        // 双指触摸时记录初始距离
+        if (e.touches.length === 2) {
+            initialPinchDistance = getDistance(e.touches[0], e.touches[1]);
+            e.preventDefault();
+            return;
+        }
         
-        // 获取第一个触摸点的坐标
-        if (e.touches.length > 0) {
+        // 单指触摸处理落子
+        if (e.touches.length === 1) {
+            e.preventDefault(); // 防止触发默认行为
+            
+            // 获取触摸点的坐标
             const touch = e.touches[0];
             const pos = getBoardPosition(touch.clientX, touch.clientY);
             if (!pos) return;
@@ -1535,6 +1556,72 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (gameMode === 'chess') {
                 handleChessClick(pos.x, pos.y);
             }
+        }
+    }, { passive: false });
+    
+    // 处理移动端缩放
+    canvas.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            
+            // 计算当前两指间距离
+            const currentDistance = getDistance(e.touches[0], e.touches[1]);
+            
+            // 计算缩放比例变化
+            if (initialPinchDistance > 0) {
+                const newScale = currentScale * (currentDistance / initialPinchDistance);
+                
+                // 限制缩放范围
+                if (newScale >= MIN_SCALE && newScale <= MAX_SCALE) {
+                    currentScale = newScale;
+                    
+                    // 应用缩放到画布
+                    canvas.style.transform = `scale(${currentScale})`;
+                    canvas.style.transformOrigin = 'center center';
+                    
+                    // 更新初始距离，使缩放更平滑
+                    initialPinchDistance = currentDistance;
+                }
+            }
+        }
+    }, { passive: false });
+    
+    canvas.addEventListener('touchend', (e) => {
+        // 重置初始距离
+        if (e.touches.length < 2) {
+            initialPinchDistance = 0;
+        }
+    });
+
+    // 添加鼠标滚轮缩放支持
+    canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        
+        // 确定缩放方向和幅度
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        const newScale = currentScale + delta;
+        
+        // 限制缩放范围
+        if (newScale >= MIN_SCALE && newScale <= MAX_SCALE) {
+            currentScale = newScale;
+            
+            // 应用缩放到画布
+            canvas.style.transform = `scale(${currentScale})`;
+            canvas.style.transformOrigin = 'center center';
+        }
+    }, { passive: false });
+
+    // 鼠标点击事件处理
+    canvas.addEventListener('click', (e) => {
+        const pos = getBoardPosition(e.clientX, e.clientY);
+        if (!pos) return;
+        
+        if (gameMode === 'go') {
+            placeGoStone(pos.x, pos.y);
+        } else if (gameMode === 'gomoku') {
+            placeGomokuStone(pos.x, pos.y);
+        } else if (gameMode === 'chess') {
+            handleChessClick(pos.x, pos.y);
         }
     });
 

@@ -10,6 +10,7 @@ body {
     justify-content: center;
     background-color: #f5f5dc;
     padding: 20px;
+    touch-action: manipulation; /* 优化移动端触摸体验 */
 }
 
 .container {
@@ -145,13 +146,33 @@ button:hover {
     justify-content: center;
     align-items: center;
     width: 100%;
-    overflow: auto;
+    overflow: hidden; /* 改为hidden以防止滚动 */
+    touch-action: none; /* 允许自定义触摸事件处理 */
 }
 
 #board {
     box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);
     margin: 0 auto;
     max-width: 100%;
+    /* 添加以下样式支持缩放功能 */
+    transform-origin: center center;
+    transition: transform 0.1s ease-out;
+    touch-action: none;
+    will-change: transform; /* 优化性能 */
+}
+
+/* 添加缩放指示 */
+.zoom-controls {
+    position: absolute;
+    bottom: -30px;
+    display: flex;
+    gap: 10px;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.zoom-controls span {
+    user-select: none;
 }
 
 @media (max-width: 600px) {
@@ -166,5 +187,28 @@ button:hover {
     
     .mode-buttons {
         flex-direction: column;
+    }
+    
+    /* 更好的移动端支持 */
+    body {
+        padding: 10px;
+    }
+    
+    .game-btn, button {
+        padding: 10px;
+        width: 100%;
+        margin-bottom: 5px;
+    }
+    
+    h1 {
+        font-size: 1.5rem;
+    }
+    
+    h2 {
+        font-size: 1.2rem;
+    }
+    
+    .player-turn, .captures {
+        font-size: 1rem;
     }
 } 
