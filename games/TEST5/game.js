@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let gravity = 0.6;
     let jumpHeight = 12;
     let moveSpeed = 10;
+    let mobileMoveSpeed = 5; // 移动端速度降低为一半
     let currentLevel = 1;
     let maxUnlockedLevel = 1;
     let gameTime = 0;
@@ -426,6 +427,11 @@ document.addEventListener('DOMContentLoaded', () => {
         player2State.platformId = null;
         player2State.isActive = true;
         player2State.reachedFinish = false;
+        
+        // 重置键盘状态
+        for (let key in keys) {
+            keys[key] = false;
+        }
     }
     
     // 更新玩家状态显示
@@ -502,6 +508,11 @@ document.addEventListener('DOMContentLoaded', () => {
             levelCompleteText.textContent = '恭喜完成关卡！';
             nextLevelBtn.style.display = 'block';
         }
+        
+        // 重置键盘状态
+        for (let key in keys) {
+            keys[key] = false;
+        }
     }
     
     // 更新玩家显示位置
@@ -521,6 +532,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function showLevelSelection() {
         levelSelection.style.display = 'flex';
         stopTimer();
+        
+        // 重置键盘状态
+        for (let key in keys) {
+            keys[key] = false;
+        }
     }
     
     // 隐藏关卡选择界面
@@ -752,14 +768,18 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 处理左右移动
         if (keys.KeyA && !isGameOver && !isLevelComplete) {
-            player1State.x -= moveSpeed;
+            // 区分PC和移动端的移动速度
+            const speed = isMobileDevice() ? mobileMoveSpeed : moveSpeed;
+            player1State.x -= speed;
             if (player1State.x < 0) {
                 player1State.x = 0;
             }
         }
         
         if (keys.KeyD && !isGameOver && !isLevelComplete) {
-            player1State.x += moveSpeed;
+            // 区分PC和移动端的移动速度
+            const speed = isMobileDevice() ? mobileMoveSpeed : moveSpeed;
+            player1State.x += speed;
             const maxX = gameContainer.offsetWidth - player1State.width;
             if (player1State.x > maxX) {
                 player1State.x = maxX;
@@ -809,14 +829,18 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 处理左右移动
         if (keys.ArrowLeft && !isGameOver && !isLevelComplete) {
-            player2State.x -= moveSpeed;
+            // 区分PC和移动端的移动速度
+            const speed = isMobileDevice() ? mobileMoveSpeed : moveSpeed;
+            player2State.x -= speed;
             if (player2State.x < 0) {
                 player2State.x = 0;
             }
         }
         
         if (keys.ArrowRight && !isGameOver && !isLevelComplete) {
-            player2State.x += moveSpeed;
+            // 区分PC和移动端的移动速度
+            const speed = isMobileDevice() ? mobileMoveSpeed : moveSpeed;
+            player2State.x += speed;
             const maxX = gameContainer.offsetWidth - player2State.width;
             if (player2State.x > maxX) {
                 player2State.x = maxX;
@@ -858,6 +882,12 @@ document.addEventListener('DOMContentLoaded', () => {
             player2State.isJumping = false;
             player2State.jumpCount = 0;
         }
+    }
+    
+    // 检测是否是移动设备
+    function isMobileDevice() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+               window.matchMedia("(max-width: 768px)").matches;
     }
     
     // 更新游戏逻辑
@@ -1090,6 +1120,11 @@ document.addEventListener('DOMContentLoaded', () => {
         stopTimer();
         gameOverText.innerText = message;
         gameOver.style.display = 'flex';
+        
+        // 重置键盘状态
+        for (let key in keys) {
+            keys[key] = false;
+        }
     }
     
     // 设置事件监听器
@@ -1189,6 +1224,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const switchPlayerBtn = document.getElementById('switch-player-btn');
         const player1Element = document.getElementById('player');
         const player2Element = document.getElementById('player2');
+        const mobileControls = document.getElementById('mobile-controls');
+        
+        // 优化移动端控制按钮样式
+        if (mobileControls) {
+            // 增加按钮大小和间距
+            if (playerLeft) playerLeft.style.width = '60px';
+            if (playerLeft) playerLeft.style.height = '60px';
+            if (playerRight) playerRight.style.width = '60px';
+            if (playerRight) playerRight.style.height = '60px';
+            if (playerJump) playerJump.style.width = '60px';
+            if (playerJump) playerJump.style.height = '60px';
+            
+            // 增加左右按钮之间的间距
+            if (playerLeft) playerLeft.style.marginRight = '40px';
+            if (playerRight) playerRight.style.marginLeft = '40px';
+        }
         
         // 当前活动玩家（默认为玩家1）
         let activePlayer = 1;
@@ -1233,6 +1284,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 左移
         if (playerLeft) {
+            // 使用移动设备时的触摸事件
             playerLeft.addEventListener('touchstart', function(e) {
                 e.preventDefault();
                 if (activePlayer === 1) {
@@ -1249,6 +1301,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     keys.ArrowLeft = false;
                 }
             });
+            
+            // 使用鼠标点击时的事件
             playerLeft.addEventListener('mousedown', function(e) {
                 e.preventDefault();
                 if (activePlayer === 1) {
@@ -1277,6 +1331,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 右移
         if (playerRight) {
+            // 使用移动设备时的触摸事件
             playerRight.addEventListener('touchstart', function(e) {
                 e.preventDefault();
                 if (activePlayer === 1) {
@@ -1293,6 +1348,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     keys.ArrowRight = false;
                 }
             });
+            
+            // 使用鼠标点击时的事件
             playerRight.addEventListener('mousedown', function(e) {
                 e.preventDefault();
                 if (activePlayer === 1) {
