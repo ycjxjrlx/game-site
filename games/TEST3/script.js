@@ -102,6 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let chessPieces = [];
     let selectedPiece = null;
     let possibleMoves = [];
+    let lastMovedPiece = null; // 用于跟踪上一步移动的棋子，添加高亮效果
 
     // 象棋棋子定义
     const chessPieceTypes = {
@@ -184,8 +185,16 @@ document.addEventListener('DOMContentLoaded', () => {
             stoneRadius = cellSize * 0.4;
             padding = cellSize;
             
-            canvas.width = boardSize * cellSize + padding * 2;
-            canvas.height = boardSize * cellSize + padding * 2;
+            // 修复：对于围棋，棋盘应该是(boardSize-1)个单元格宽度加上两侧padding
+            if (gameMode === 'go') {
+                // 围棋棋盘尺寸应为线的数量-1再加padding，因为围棋是在交叉点落子
+                canvas.width = (boardSize - 1) * cellSize + padding * 2;
+                canvas.height = (boardSize - 1) * cellSize + padding * 2;
+            } else {
+                // 五子棋是在格子内落子，所以保持原有逻辑
+                canvas.width = boardSize * cellSize + padding * 2;
+                canvas.height = boardSize * cellSize + padding * 2;
+            }
             
             console.log("围棋/五子棋画布尺寸：", canvas.width, "x", canvas.height, "像素");
             console.log("单元格大小：", cellSize, "像素");
@@ -563,6 +572,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.lineWidth = 2;
                 ctx.stroke();
             }
+            
+            // 添加上一步移动棋子的边缘光环效果
+            if (lastMovedPiece === piece) {
+                // 保存当前上下文状态
+                ctx.save();
+                
+                // 绘制外圈光环
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, pieceRadius * 1.15, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.lineWidth = pieceRadius * 0.25;
+                ctx.stroke();
+                
+                // 绘制内圈亮边
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, pieceRadius * 1.03, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.lineWidth = pieceRadius * 0.07;
+                ctx.stroke();
+                
+                // 恢复上下文状态
+                ctx.restore();
+            }
         }
     }
 
@@ -749,15 +781,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // 获取鼠标点击在棋盘上的位置
     function getBoardPosition(clientX, clientY) {
         const rect = canvas.getBoundingClientRect();
-        // 修复：使用正确的坐标换算，包括考虑设备像素比
-        const scale = window.devicePixelRatio || 1;
-        const x = (clientX - rect.left) * (canvas.width / rect.width / scale);
-        const y = (clientY - rect.top) * (canvas.height / rect.height / scale);
+        // 移除缩放相关计算，直接使用画布坐标比例
+        const x = (clientX - rect.left) * (canvas.width / rect.width);
+        const y = (clientY - rect.top) * (canvas.height / rect.height);
         
         // 增加调试信息，帮助排查问题
         console.log("点击/触摸位置:", {clientX, clientY});
         console.log("画布位置:", {left: rect.left, top: rect.top, width: rect.width, height: rect.height});
-        console.log("相对坐标:", {x, y, scale: scale});
+        console.log("相对坐标:", {x, y});
         
         if (gameMode === 'chess') {
             // 计算棋盘的位置
@@ -1338,6 +1369,7 @@ document.addEventListener('DOMContentLoaded', () => {
         blackCapturesDisplay.textContent = '0';
         whiteCapturesDisplay.textContent = '0';
         lastMove = null; // 确保清除上一步记录
+        lastMovedPiece = null; // 重置上一步移动的棋子记录
         consecutivePasses = 0;
         gameOver = false;
         isAIThinking = false;
@@ -1518,26 +1550,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 事件监听
-    // 添加移动端的缩放功能
-    let initialPinchDistance = 0;
-    let currentScale = 1;
-    const MAX_SCALE = 3;
-    const MIN_SCALE = 0.5;
-    
-    function getDistance(touch1, touch2) {
-        const dx = touch1.clientX - touch2.clientX;
-        const dy = touch1.clientY - touch2.clientY;
-        return Math.sqrt(dx * dx + dy * dy);
-    }
-    
     canvas.addEventListener('touchstart', (e) => {
-        // 双指触摸时记录初始距离
-        if (e.touches.length === 2) {
-            initialPinchDistance = getDistance(e.touches[0], e.touches[1]);
-            e.preventDefault();
-            return;
-        }
-        
         // 单指触摸处理落子
         if (e.touches.length === 1) {
             e.preventDefault(); // 防止触发默认行为
@@ -1559,58 +1572,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, { passive: false });
     
-    // 处理移动端缩放
-    canvas.addEventListener('touchmove', (e) => {
-        if (e.touches.length === 2) {
-            e.preventDefault();
-            
-            // 计算当前两指间距离
-            const currentDistance = getDistance(e.touches[0], e.touches[1]);
-            
-            // 计算缩放比例变化
-            if (initialPinchDistance > 0) {
-                const newScale = currentScale * (currentDistance / initialPinchDistance);
-                
-                // 限制缩放范围
-                if (newScale >= MIN_SCALE && newScale <= MAX_SCALE) {
-                    currentScale = newScale;
-                    
-                    // 应用缩放到画布
-                    canvas.style.transform = `scale(${currentScale})`;
-                    canvas.style.transformOrigin = 'center center';
-                    
-                    // 更新初始距离，使缩放更平滑
-                    initialPinchDistance = currentDistance;
-                }
-            }
-        }
-    }, { passive: false });
+    // 删除touchmove和touchend事件监听器中的缩放处理代码
     
-    canvas.addEventListener('touchend', (e) => {
-        // 重置初始距离
-        if (e.touches.length < 2) {
-            initialPinchDistance = 0;
-        }
-    });
-
-    // 添加鼠标滚轮缩放支持
-    canvas.addEventListener('wheel', (e) => {
-        e.preventDefault();
-        
-        // 确定缩放方向和幅度
-        const delta = e.deltaY > 0 ? -0.1 : 0.1;
-        const newScale = currentScale + delta;
-        
-        // 限制缩放范围
-        if (newScale >= MIN_SCALE && newScale <= MAX_SCALE) {
-            currentScale = newScale;
-            
-            // 应用缩放到画布
-            canvas.style.transform = `scale(${currentScale})`;
-            canvas.style.transformOrigin = 'center center';
-        }
-    }, { passive: false });
-
+    // 删除鼠标滚轮缩放支持
+    
     // 鼠标点击事件处理
     canvas.addEventListener('click', (e) => {
         const pos = getBoardPosition(e.clientX, e.clientY);
@@ -1913,6 +1878,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // 移动棋子
         piece.x = toX;
         piece.y = toY;
+        
+        // 更新上一步移动的棋子，用于高亮显示
+        lastMovedPiece = piece;
         
         // 更新棋盘数组
         updateChessBoardArray();
@@ -2308,7 +2276,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // 初始化
     initBoard();
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+    
+    // 添加窗口大小变化事件监听
+    window.addEventListener('resize', () => {
+        resizeCanvas();
+    });
 
     // 确保添加选边按钮事件
     function attachSideButtonEvents() {
@@ -2368,4 +2340,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (chessSettings && chessSettings.querySelector('.side-selection')) {
         chessSettings.querySelector('.side-selection').style.display = 'none';
     }
+    
+    // 调试信息
+    console.log("棋类游戏初始化完成，当前模式:", gameMode);
 }); 
