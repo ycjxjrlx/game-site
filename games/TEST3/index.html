@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>棋类游戏</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>棋类游戏</h1>
+        
+        <!-- 游戏选择 -->
+        <div class="game-selection">
+            <button id="go-game-btn" class="game-btn active">围棋</button>
+            <button id="gomoku-game-btn" class="game-btn">五子棋</button>
+            <button id="chess-game-btn" class="game-btn">中国象棋</button>
+        </div>
+        
+        <!-- 围棋设置 -->
+        <div id="go-settings" class="game-settings">
+            <h2>围棋设置</h2>
+            <div class="board-size-selection">
+                <label>棋盘大小:</label>
+                <select id="go-board-size">
+                    <option value="9">9×9</option>
+                    <option value="13">13×13</option>
+                    <option value="19" selected>19×19</option>
+                </select>
+            </div>
+            <!-- 游戏模式选择将由JS添加 -->
+        </div>
+        
+        <!-- 五子棋设置 -->
+        <div id="gomoku-settings" class="game-settings" style="display: none;">
+            <h2>五子棋设置</h2>
+            <p>标准15×15棋盘</p>
+            <!-- 游戏模式选择将由JS添加 -->
+        </div>
+        
+        <!-- 象棋设置 -->
+        <div id="chess-settings" class="game-settings" style="display: none;">
+            <h2>中国象棋设置</h2>
+            <p>传统中国象棋</p>
+            <!-- 游戏模式选择将由JS添加 -->
+        </div>
+        
+        <!-- 通用游戏信息 -->
+        <div class="game-info">
+            <div class="player-turn">当前玩家: <span id="current-player">黑</span></div>
+            <div id="captures-container" class="captures">
+                <span>黑方提子: <span id="black-captures">0</span></span>
+                <span>白方提子: <span id="white-captures">0</span></span>
+            </div>
+            <button id="pass-btn">虚着</button>
+            <button id="reset-btn">重新开始</button>
+        </div>
+        
+        <div class="board-container">
+            <canvas id="board"></canvas>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html> 
