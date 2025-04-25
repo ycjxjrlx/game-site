@@ -737,6 +737,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const x = clientX - rect.left;
         const y = clientY - rect.top;
         
+        // 增加调试信息，帮助排查问题
+        console.log("点击/触摸位置:", {clientX, clientY});
+        console.log("画布位置:", {left: rect.left, top: rect.top});
+        console.log("相对坐标:", {x, y});
+        
         if (gameMode === 'chess') {
             // 计算棋盘的位置
             const boardWidth = (boardSize.width - 1) * cellSize;
@@ -747,6 +752,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // 将点击坐标转换为棋盘坐标
             let boardX = Math.round((x - boardLeft) / cellSize);
             let boardY = Math.round((y - boardTop) / cellSize);
+            
+            console.log("象棋坐标转换:", {boardX, boardY, boardLeft, boardTop});
             
             // 确保在有效范围内
             if (boardX < 0) boardX = 0;
@@ -774,6 +781,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 boardX = Math.round((x - padding) / cellSize);
                 boardY = Math.round((y - padding) / cellSize);
             }
+            
+            console.log("围棋/五子棋坐标转换:", {boardX, boardY, padding});
             
             // 检查点击位置是否在有效范围内
             if (boardX >= 0 && boardX < boardSize && boardY >= 0 && boardY < boardSize) {
@@ -1492,6 +1501,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 事件监听
+    // 鼠标点击事件处理
     canvas.addEventListener('click', (e) => {
         const pos = getBoardPosition(e.clientX, e.clientY);
         if (!pos) return;
@@ -1502,6 +1512,29 @@ document.addEventListener('DOMContentLoaded', () => {
             placeGomokuStone(pos.x, pos.y);
         } else if (gameMode === 'chess') {
             handleChessClick(pos.x, pos.y);
+        }
+    });
+    
+    // 添加触摸事件支持，解决移动设备上的问题
+    canvas.addEventListener('touchstart', (e) => {
+        // 防止触摸事件触发后又触发点击事件
+        e.preventDefault();
+        
+        // 获取第一个触摸点的坐标
+        if (e.touches.length > 0) {
+            const touch = e.touches[0];
+            const pos = getBoardPosition(touch.clientX, touch.clientY);
+            if (!pos) return;
+            
+            console.log("触摸事件触发:", pos);
+            
+            if (gameMode === 'go') {
+                placeGoStone(pos.x, pos.y);
+            } else if (gameMode === 'gomoku') {
+                placeGomokuStone(pos.x, pos.y);
+            } else if (gameMode === 'chess') {
+                handleChessClick(pos.x, pos.y);
+            }
         }
     });
 
