@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>忍者跑酷</title>
+    <link rel="stylesheet" href="style.css">
+    <script>
+        // 定义一个全局的startGame函数，以便内联onclick属性可以调用
+        function startGame() {
+            console.log('开始游戏函数被调用');
+            document.getElementById('game-menu').style.display = 'none';
+            
+            const debugOutput = document.getElementById('debug-output');
+            if (debugOutput) {
+                debugOutput.innerHTML += '开始游戏函数被调用<br>';
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+        
+        <div id="ui-overlay">
+            <div id="health-bar-container">
+                <div id="health-bar"></div>
+            </div>
+            <div id="energy-bar-container">
+                <div id="energy-bar"></div>
+            </div>
+            
+            <!-- 移动端控制按钮 -->
+            <div id="mobile-controls">
+                <div id="jump-btn">跳跃</div>
+                <div id="attack-btn">攻击</div>
+                <div id="dodge-btn">闪避</div>
+                <div id="weapon-switch-btn">切换武器</div>
+                <div id="skill-btn">技能</div>
+            </div>
+            
+            <!-- 游戏菜单 -->
+            <div id="game-menu">
+                <h1>忍者跑酷</h1>
+                <button id="start-btn" onclick="startGame();">开始游戏</button>
+                <button id="restart-btn" style="display: none;">重新开始</button>
+            </div>
+            
+            <!-- 游戏结束 -->
+            <div id="game-over" style="display: none;">
+                <h2>游戏结束</h2>
+                <p id="final-score">得分: 0</p>
+                <button id="restart-game-btn">再试一次</button>
+                <button id="menu-btn">返回主菜单</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 预加载图像 -->
+    <div id="preload" style="display: none;">
+        <!-- 这里将由JavaScript动态添加图像 -->
+    </div>
+    
+    <!-- 添加调试信息显示区域 -->
+    <div id="debug-info" style="position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 10px; max-width: 300px; z-index: 9999; display: none;">
+        <div>调试信息：</div>
+        <div id="debug-output"></div>
+    </div>
+    
+    <script>
+        // 简单的调试函数
+        function debugLog(message) {
+            console.log(message);
+            const debugOutput = document.getElementById('debug-output');
+            if (debugOutput) {
+                debugOutput.innerHTML += message + '<br>';
+            }
+        }
+        
+        // 页面加载完成后显示调试信息
+        window.addEventListener('load', function() {
+            debugLog('页面加载完成');
+            
+            // 测试按钮可点击性
+            const startBtn = document.getElementById('start-btn');
+            if (startBtn) {
+                debugLog('找到开始游戏按钮');
+                
+                // 添加额外的点击事件监听器
+                startBtn.addEventListener('click', function() {
+                    debugLog('按钮被点击（通过事件监听器）！');
+                    // 直接隐藏菜单
+                    document.getElementById('game-menu').style.display = 'none';
+                });
+            } else {
+                debugLog('未找到开始游戏按钮');
+            }
+        });
+    </script>
+    
+    <!-- 先加载调试脚本 -->
+    <script src="debug.js"></script>
+    <!-- 然后加载主游戏脚本 -->
+    <script src="script.js"></script>
+</body>
+</html> 
