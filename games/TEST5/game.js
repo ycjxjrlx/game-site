@@ -36,8 +36,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let timerInterval;
     let isLevelComplete = false;
     let debugMode = false;
-    
-    // --- 修复重点1：给一个默认值，防止CSS未加载时为0 ---
     let containerWidth = 800; 
     
     // 地面高度设置
@@ -88,7 +86,6 @@ document.addEventListener('DOMContentLoaded', () => {
         reachedFinish: false
     };
     
-    // 从本地存储加载游戏进度
     function loadGameProgress() {
         const savedProgress = localStorage.getItem('jumpGameProgress');
         if (savedProgress) {
@@ -97,7 +94,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // 保存游戏进度
     function saveGameProgress() {
         const progress = {
             maxUnlockedLevel: maxUnlockedLevel
@@ -105,7 +101,6 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('jumpGameProgress', JSON.stringify(progress));
     }
     
-    // 重置游戏进度
     function resetGameProgress() {
         maxUnlockedLevel = 1;
         saveGameProgress();
@@ -113,7 +108,6 @@ document.addEventListener('DOMContentLoaded', () => {
         showLevelSelection();
     }
     
-    // 创建关卡按钮
     function createLevelButtons() {
         levelButtons.innerHTML = '';
         for (let i = 1; i <= LEVELS.length; i++) {
@@ -130,7 +124,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // 关卡配置
     const LEVELS = [
         // 关卡 1
         {
@@ -283,13 +276,10 @@ document.addEventListener('DOMContentLoaded', () => {
         gameContainer.appendChild(ground);
     }
 
-    // 加载关卡
     function loadLevel(levelIndex) {
         clearGameElements();
         createGround();
         
-        // --- 修复重点2：安全获取宽度 ---
-        // 尝试获取 offsetWidth，如果为 0 (CSS未加载/隐藏) 则使用兜底值 800
         const currentWidth = gameContainer.offsetWidth;
         containerWidth = currentWidth > 0 ? currentWidth : 800;
         
@@ -345,33 +335,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const start = document.getElementById('start');
         const finish = document.getElementById('finish');
         
+        start.style.zIndex = '4';
+        finish.style.zIndex = '4';
+
         start.style.left = `${level.startX}px`;
         start.style.bottom = `${GROUND_HEIGHT}px`;
         
-        // --- 修复重点3：修改终点定位逻辑 ---
-        // 之前：finish.style.right = (containerWidth - level.finishX) + 'px';
-        // 如果 containerWidth 是 0，right 就是 -700，导致终点消失。
-        // 现在：直接用 left 定位，与起点一致，不依赖容器宽度。
-        finish.style.right = ''; // 清除 right 样式
-        finish.style.left = `${level.finishX}px`; // 修正：假设 level.finishX 是坐标
-        // 实际上之前的逻辑是 right = width - finishX，说明 finishX 是从左边算的坐标
-        // 但为了安全，我们再确认一下 level.finishX 的语义。
-        // 你的 config 里 finishX 是 700。容器 800。
-        // 所以终点确实在 left: 700px 的位置。
+        finish.style.right = ''; 
+        finish.style.left = `${level.finishX}px`; 
         finish.style.bottom = `${GROUND_HEIGHT}px`;
         
         const finishWidth = finish.offsetWidth || 50;
         const finishHeight = finish.offsetHeight || 100;
         
-        // 由于 finish 元素现在定位在 left: 700px，它的判定框 x 也就是 700。
-        // 注意：原代码的判定逻辑可能有误解，如果 css 是 right: 100px，left 就是 700。
-        // 之前的判定逻辑：realFinishX = level.finishX - finishWidth;
-        // 如果 level.finishX 代表的是“终点元素的左边缘坐标”，那么直接用它。
-        // 在你的 config 中 finishX=700 (对于800宽容器，在右侧)。
-        // 所以我们让 CSS left = 700px，逻辑 x = 700。
-        
         levelObjects.finish = {
-            x: level.finishX, // 直接使用配置的坐标
+            x: level.finishX, 
             y: GROUND_HEIGHT, 
             width: finishWidth, 
             height: finishHeight 
@@ -430,11 +408,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // 开始关卡
     function startLevel(levelIndex) {
         stopTimer();
         currentLevel = levelIndex;
         
+        for (let key in keys) {
+            keys[key] = false;
+        }
+
         loadLevel(currentLevel);
         
         const level = LEVELS[currentLevel - 1];
@@ -461,12 +442,10 @@ document.addEventListener('DOMContentLoaded', () => {
         requestAnimationFrame(gameLoop);
     }
     
-    // 重置玩家状态
     function resetPlayerStates() {
         const level = LEVELS[currentLevel - 1];
         const startX = level ? level.startX : 50;
         
-        // 重置玩家1
         player1State.x = startX;
         player1State.y = GROUND_HEIGHT;
         player1State.prevY = GROUND_HEIGHT;
@@ -479,7 +458,6 @@ document.addEventListener('DOMContentLoaded', () => {
         player1State.isActive = true;
         player1State.reachedFinish = false;
         
-        // 重置玩家2
         player2State.x = startX + 40;
         player2State.y = GROUND_HEIGHT;
         player2State.prevY = GROUND_HEIGHT;
@@ -497,7 +475,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // 更新玩家状态显示
     function updatePlayerStatusDisplay() {
         player1Status.textContent = player1State.isActive ? 
             (player1State.reachedFinish ? "已完成" : "活跃") : "失败";
@@ -510,7 +487,6 @@ document.addEventListener('DOMContentLoaded', () => {
             (player2State.reachedFinish ? "#ffc107" : "white") : "#ff5252";
     }
     
-    // 开始计时器
     function startTimer() {
         gameTime = 0;
         timerDisplay.textContent = '0';
@@ -520,7 +496,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1000);
     }
     
-    // 停止计时器
     function stopTimer() {
         if (timerInterval) {
             clearInterval(timerInterval);
@@ -528,7 +503,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // 完成关卡
     function completeLevel() {
         isLevelComplete = true;
         stopTimer();
@@ -571,7 +545,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // 更新玩家显示位置
     function updatePlayersDisplay() {
         if (player1State.reachedFinish) {
             player1Element.style.display = 'none';
@@ -613,6 +586,54 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     }
     
+    function checkPlayerToPlayerCollision(targetX, targetY, me, other) {
+        if (!other.isActive || other.reachedFinish) return false; 
+
+        return (
+            targetX < other.x + other.width &&
+            targetX + me.width > other.x &&
+            targetY < other.y + other.height &&
+            targetY + me.height > other.y
+        );
+    }
+
+    // --- 新增：垂直碰撞检测（踩头） ---
+    function checkPlayerLandingOnPlayer(playerState, otherPlayer) {
+        // 如果对方已经通关或挂了，则不发生碰撞
+        if (!otherPlayer.isActive || otherPlayer.reachedFinish) return false;
+        // 只有下落时才检测踩头
+        if (playerState.velocityY > 0) return false; 
+
+        const myLeft = playerState.x;
+        const myRight = playerState.x + playerState.width;
+        const myBottom = playerState.y;
+        const myPrevBottom = playerState.prevY; 
+
+        const otherTop = otherPlayer.y + otherPlayer.height;
+        const otherLeft = otherPlayer.x;
+        const otherRight = otherPlayer.x + otherPlayer.width;
+
+        // 水平方向必须有重叠（稍微放宽2px，防止边缘判定抖动）
+        const hasHorizontalOverlap = 
+            myRight > otherLeft + 2 && 
+            myLeft < otherRight - 2;
+        
+        // 垂直穿过检测：上一帧在对方头顶上方（或刚好接触），当前帧落到了对方头顶下方
+        const landedOnTop = 
+            myPrevBottom >= otherTop - 5 && // 允许5px的容错，处理快速移动或浮点误差
+            myBottom <= otherTop;
+
+        if (hasHorizontalOverlap && landedOnTop) {
+            // 修正位置：站在对方头顶
+            playerState.y = otherTop;
+            playerState.velocityY = 0;
+            playerState.onGround = true;
+            playerState.onPlatform = true; // 标记为站在平台上
+            return true;
+        }
+        return false;
+    }
+
     function checkObstacleCollisions(playerState) {
         if (!playerState.isActive) return false;
         
@@ -747,36 +768,41 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    // 通用玩家更新逻辑
     function updatePlayerPhysics(playerState, leftKey, rightKey, element) {
         if (!playerState.isActive || playerState.reachedFinish) return;
 
         playerState.prevY = playerState.y;
         
-        // 移动
+        const otherPlayer = playerState === player1State ? player2State : player1State;
+
         if (keys[leftKey] && !isGameOver && !isLevelComplete) {
             const speed = isMobileDevice() ? mobileMoveSpeed : moveSpeed;
-            playerState.x -= speed;
-            if (playerState.x < 0) playerState.x = 0;
+            const nextX = playerState.x - speed;
+            if (!checkPlayerToPlayerCollision(nextX, playerState.y, playerState, otherPlayer)) {
+                playerState.x = nextX;
+                if (playerState.x < 0) playerState.x = 0;
+            }
         }
         if (keys[rightKey] && !isGameOver && !isLevelComplete) {
             const speed = isMobileDevice() ? mobileMoveSpeed : moveSpeed;
-            playerState.x += speed;
-            const maxX = containerWidth - playerState.width;
-            if (playerState.x > maxX) playerState.x = maxX;
+            const nextX = playerState.x + speed;
+            if (!checkPlayerToPlayerCollision(nextX, playerState.y, playerState, otherPlayer)) {
+                playerState.x = nextX;
+                const maxX = containerWidth - playerState.width;
+                if (playerState.x > maxX) playerState.x = maxX;
+            }
         }
         
-        // 重力
         playerState.velocityY -= gravity;
         if (playerState.velocityY < -12) playerState.velocityY = -12;
         
-        // 更新Y
         playerState.y += playerState.velocityY;
         
-        // 平台检测
         checkPlatforms(playerState);
         
-        // 地面检测
+        // --- 调用垂直碰撞检测 ---
+        checkPlayerLandingOnPlayer(playerState, otherPlayer);
+
         if (playerState.y <= GROUND_HEIGHT) {
             playerState.y = GROUND_HEIGHT;
             playerState.velocityY = 0;
@@ -785,7 +811,6 @@ document.addEventListener('DOMContentLoaded', () => {
             playerState.jumpCount = 0;
         }
         
-        // 落地动画
         if (playerState.onGround && playerState.velocityY <= 0 && playerState.isJumping) {
              element.style.transition = 'transform 0.1s';
              element.style.transform = 'scaleY(0.9)';
@@ -982,35 +1007,49 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        if (playerJump) {
-            playerJump.addEventListener('click', function(e) {
-                e.preventDefault();
-                if (activePlayer === 1) jumpPlayer(player1State);
-                else jumpPlayer(player2State);
-            });
-        }
-        
-        // --- 修复重点4：优化触摸处理 ---
-        const setupMoveBtn = (btn, key1, key2) => {
+        const bindButtonAction = (btn, actionType, key1, key2) => {
             if (!btn) return;
-            const start = (e) => { 
-                e.preventDefault(); // 防止同时触发touch和mouse
-                if(activePlayer===1) keys[key1]=true; else keys[key2]=true; 
-            };
-            const end = (e) => { 
-                e.preventDefault(); 
-                if(activePlayer===1) keys[key1]=false; else keys[key2]=false; 
-            };
             
-            btn.addEventListener('touchstart', start, {passive: false});
-            btn.addEventListener('touchend', end, {passive: false});
-            btn.addEventListener('mousedown', start);
-            btn.addEventListener('mouseup', end);
-            btn.addEventListener('mouseleave', end);
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+            btn = newBtn;
+            
+            const handleStart = (e) => {
+                e.preventDefault(); 
+                if (actionType === 'jump') {
+                    if (activePlayer === 1) jumpPlayer(player1State);
+                    else jumpPlayer(player2State);
+                } else if (actionType === 'move') {
+                    if (activePlayer === 1) keys[key1] = true;
+                    else keys[key2] = true;
+                }
+            };
+
+            const handleEnd = (e) => {
+                e.preventDefault();
+                if (actionType === 'move') {
+                    if (activePlayer === 1) keys[key1] = false;
+                    else keys[key2] = false;
+                }
+            };
+
+            btn.addEventListener('touchstart', handleStart, { passive: false });
+            btn.addEventListener('touchend', handleEnd, { passive: false });
+            btn.addEventListener('touchcancel', handleEnd, { passive: false }); 
+            
+            btn.addEventListener('mousedown', handleStart);
+            btn.addEventListener('mouseup', handleEnd);
+            btn.addEventListener('mouseleave', handleEnd);
         };
         
-        setupMoveBtn(playerLeft, 'KeyA', 'ArrowLeft');
-        setupMoveBtn(playerRight, 'KeyD', 'ArrowRight');
+        const leftBtn = document.getElementById('player-left');
+        bindButtonAction(leftBtn, 'move', 'KeyA', 'ArrowLeft');
+        
+        const rightBtn = document.getElementById('player-right');
+        bindButtonAction(rightBtn, 'move', 'KeyD', 'ArrowRight');
+        
+        const jumpBtn = document.getElementById('player-jump');
+        bindButtonAction(jumpBtn, 'jump');
     }
     
     function detectDeviceAndSetControls() {
@@ -1019,6 +1058,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function initGame() {
+        if(player1Element) player1Element.style.transition = 'transform 0.1s';
+        if(player2Element) player2Element.style.transition = 'transform 0.1s';
+
         loadGameProgress();
         createLevelButtons();
         setupEventListeners();
