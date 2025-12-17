@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetProgressBtn = document.getElementById('reset-progress-btn');
     const player1Status = document.getElementById('player1-status');
     const player2Status = document.getElementById('player2-status');
-    const switchPlayerBtn = document.getElementById('switch-player-btn'); // 获取切换按钮
+    const switchPlayerBtn = document.getElementById('switch-player-btn');
     
     // 游戏参数
     let isGameOver = false;
@@ -36,9 +36,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let timerInterval;
     let isLevelComplete = false;
     let debugMode = false;
-    let containerWidth = 800;
     
-    // --- 新增：地面高度设置 ---
+    // --- 修复重点1：给一个默认值，防止CSS未加载时为0 ---
+    let containerWidth = 800; 
+    
+    // 地面高度设置
     const GROUND_HEIGHT = 140; 
 
     // 缓存关卡对象数据
@@ -254,7 +256,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     ];
     
-    // 清除游戏元素
     function clearGameElements() {
         document.querySelectorAll('.obstacle, .platform, .water, .fire, .ground-layer').forEach(element => {
             element.remove();
@@ -268,7 +269,6 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
     
-    // 创建地面元素
     function createGround() {
         const ground = document.createElement('div');
         ground.className = 'ground-layer';
@@ -288,7 +288,11 @@ document.addEventListener('DOMContentLoaded', () => {
         clearGameElements();
         createGround();
         
-        containerWidth = gameContainer.offsetWidth;
+        // --- 修复重点2：安全获取宽度 ---
+        // 尝试获取 offsetWidth，如果为 0 (CSS未加载/隐藏) 则使用兜底值 800
+        const currentWidth = gameContainer.offsetWidth;
+        containerWidth = currentWidth > 0 ? currentWidth : 800;
+        
         const level = LEVELS[levelIndex - 1];
         if (!level) return;
         
@@ -344,16 +348,30 @@ document.addEventListener('DOMContentLoaded', () => {
         start.style.left = `${level.startX}px`;
         start.style.bottom = `${GROUND_HEIGHT}px`;
         
-        finish.style.right = `${containerWidth - level.finishX}px`;
+        // --- 修复重点3：修改终点定位逻辑 ---
+        // 之前：finish.style.right = (containerWidth - level.finishX) + 'px';
+        // 如果 containerWidth 是 0，right 就是 -700，导致终点消失。
+        // 现在：直接用 left 定位，与起点一致，不依赖容器宽度。
+        finish.style.right = ''; // 清除 right 样式
+        finish.style.left = `${level.finishX}px`; // 修正：假设 level.finishX 是坐标
+        // 实际上之前的逻辑是 right = width - finishX，说明 finishX 是从左边算的坐标
+        // 但为了安全，我们再确认一下 level.finishX 的语义。
+        // 你的 config 里 finishX 是 700。容器 800。
+        // 所以终点确实在 left: 700px 的位置。
         finish.style.bottom = `${GROUND_HEIGHT}px`;
         
         const finishWidth = finish.offsetWidth || 50;
         const finishHeight = finish.offsetHeight || 100;
         
-        const realFinishX = level.finishX - finishWidth;
-
+        // 由于 finish 元素现在定位在 left: 700px，它的判定框 x 也就是 700。
+        // 注意：原代码的判定逻辑可能有误解，如果 css 是 right: 100px，left 就是 700。
+        // 之前的判定逻辑：realFinishX = level.finishX - finishWidth;
+        // 如果 level.finishX 代表的是“终点元素的左边缘坐标”，那么直接用它。
+        // 在你的 config 中 finishX=700 (对于800宽容器，在右侧)。
+        // 所以我们让 CSS left = 700px，逻辑 x = 700。
+        
         levelObjects.finish = {
-            x: realFinishX, 
+            x: level.finishX, // 直接使用配置的坐标
             y: GROUND_HEIGHT, 
             width: finishWidth, 
             height: finishHeight 
@@ -434,7 +452,6 @@ document.addEventListener('DOMContentLoaded', () => {
         gameOver.style.display = 'none';
         levelComplete.style.display = 'none';
         
-        // 确保关卡开始时按钮和玩家是可见的
         if(switchPlayerBtn) switchPlayerBtn.style.display = 'flex';
         player1Element.style.display = 'block';
         player2Element.style.display = 'block';
@@ -556,7 +573,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 更新玩家显示位置
     function updatePlayersDisplay() {
-        // --- 修改：如果已到达终点，隐藏DOM ---
         if (player1State.reachedFinish) {
             player1Element.style.display = 'none';
         } else {
@@ -576,7 +592,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // 显示关卡选择界面
     function showLevelSelection() {
         levelSelection.style.display = 'flex';
         stopTimer();
@@ -589,7 +604,6 @@ document.addEventListener('DOMContentLoaded', () => {
         levelSelection.style.display = 'none';
     }
     
-    // 检测碰撞 - 纯数据比较
     function checkCollision(obj1, obj2) {
         return (
             obj1.x < obj2.x + obj2.width &&
@@ -599,7 +613,6 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     }
     
-    // 检测障碍物碰撞
     function checkObstacleCollisions(playerState) {
         if (!playerState.isActive) return false;
         
@@ -619,7 +632,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return false;
     }
     
-    // 检测终点碰撞
     function checkFinishCollision(playerState) {
         if (!playerState.isActive) return false;
         if (playerState.reachedFinish) return false;
@@ -638,7 +650,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return collision;
     }
     
-    // 检测平台碰撞
     function checkPlatforms(playerState) {
         if (playerState.velocityY > 0 || !playerState.isActive) {
             return false;
@@ -684,7 +695,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return false;
     }
     
-    // 控制玩家跳跃
     function jumpPlayer(playerState) {
         if (playerState.jumpCount < playerState.maxJumpCount && playerState.isActive && !isGameOver && !isLevelComplete) {
             playerState.velocityY = jumpHeight;
@@ -704,7 +714,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // 键盘状态
     const keys = {
         KeyW: false, KeyA: false, KeyD: false,
         ArrowUp: false, ArrowLeft: false, ArrowRight: false
@@ -728,7 +737,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (e.code === 'Space') {
             const switchBtn = document.getElementById('switch-player-btn');
-            // 如果按钮是隐藏的，则不允许通过空格键切换
             if(switchBtn && switchBtn.style.display !== 'none') switchBtn.click();
         }
     });
@@ -741,7 +749,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 通用玩家更新逻辑
     function updatePlayerPhysics(playerState, leftKey, rightKey, element) {
-        // --- 修改：如果已到达终点，不再更新物理 ---
         if (!playerState.isActive || playerState.reachedFinish) return;
 
         playerState.prevY = playerState.y;
@@ -803,13 +810,11 @@ document.addEventListener('DOMContentLoaded', () => {
                window.matchMedia("(max-width: 768px)").matches;
     }
     
-    // 更新游戏逻辑
     function updateGame() {
         updatePlayer1();
         updatePlayer2();
         updatePlayersDisplay();
         
-        // --- 修改：处理终点逻辑 ---
         if (player1State.isActive) {
             if (checkObstacleCollisions(player1State) || checkWaterCollisions(player1State)) {
                 player1State.isActive = false;
@@ -818,12 +823,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (checkFinishCollision(player1State)) {
                 player1State.reachedFinish = true;
                 updatePlayerStatusDisplay();
-                // 玩家1到达终点：如果玩家2还没到，隐藏切换按钮，并确保控制权转给玩家2
                 if (!player2State.reachedFinish) {
                     if (switchPlayerBtn) {
-                        // 强制切换控制权给P2（假设按钮当前是P1状态）
                         if (switchPlayerBtn.textContent === 'P1') switchPlayerBtn.click();
-                        // 隐藏按钮
                         switchPlayerBtn.style.display = 'none';
                     }
                 }
@@ -838,12 +840,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (checkFinishCollision(player2State)) {
                 player2State.reachedFinish = true;
                 updatePlayerStatusDisplay();
-                // 玩家2到达终点：如果玩家1还没到，隐藏切换按钮，并确保控制权转给玩家1
                 if (!player1State.reachedFinish) {
                     if (switchPlayerBtn) {
-                        // 强制切换控制权给P1（假设按钮当前是P2状态）
                         if (switchPlayerBtn.textContent === 'P2') switchPlayerBtn.click();
-                        // 隐藏按钮
                         switchPlayerBtn.style.display = 'none';
                     }
                 }
@@ -864,7 +863,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // 检测水池碰撞
     function checkWaterCollisions(playerState) {
         if (playerState === player2State) return false;
         if (!playerState.isActive || playerState.reachedFinish) return false;
@@ -885,7 +883,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return false;
     }
     
-    // 检测火池碰撞
     function checkFireCollisions(playerState) {
         if (playerState === player1State) return false;
         if (!playerState.isActive || playerState.reachedFinish) return false;
@@ -906,7 +903,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return false;
     }
     
-    // 游戏循环
     function gameLoop() {
         if (isGameOver || isLevelComplete) return;
         updateGame();
@@ -994,14 +990,20 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        // 统一处理移动按键，避免事件冲突
+        // --- 修复重点4：优化触摸处理 ---
         const setupMoveBtn = (btn, key1, key2) => {
             if (!btn) return;
-            const start = (e) => { e.preventDefault(); if(activePlayer===1) keys[key1]=true; else keys[key2]=true; };
-            const end = (e) => { e.preventDefault(); if(activePlayer===1) keys[key1]=false; else keys[key2]=false; };
+            const start = (e) => { 
+                e.preventDefault(); // 防止同时触发touch和mouse
+                if(activePlayer===1) keys[key1]=true; else keys[key2]=true; 
+            };
+            const end = (e) => { 
+                e.preventDefault(); 
+                if(activePlayer===1) keys[key1]=false; else keys[key2]=false; 
+            };
             
-            btn.addEventListener('touchstart', start);
-            btn.addEventListener('touchend', end);
+            btn.addEventListener('touchstart', start, {passive: false});
+            btn.addEventListener('touchend', end, {passive: false});
             btn.addEventListener('mousedown', start);
             btn.addEventListener('mouseup', end);
             btn.addEventListener('mouseleave', end);
