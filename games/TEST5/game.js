@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetProgressBtn = document.getElementById('reset-progress-btn');
     const player1Status = document.getElementById('player1-status');
     const player2Status = document.getElementById('player2-status');
+    const switchPlayerBtn = document.getElementById('switch-player-btn'); // 获取切换按钮
     
     // 游戏参数
     let isGameOver = false;
@@ -38,7 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let containerWidth = 800;
     
     // --- 新增：地面高度设置 ---
-    // 设置为 140px 以确保超过底部的控制按钮高度
     const GROUND_HEIGHT = 140; 
 
     // 缓存关卡对象数据
@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 玩家1状态
     const player1State = {
         x: 50,
-        y: GROUND_HEIGHT,   // 初始高度设为地面高度
+        y: GROUND_HEIGHT,
         prevY: GROUND_HEIGHT,
         width: 30,
         height: 50,
@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 玩家2状态
     const player2State = {
         x: 100,
-        y: GROUND_HEIGHT,   // 初始高度设为地面高度
+        y: GROUND_HEIGHT,
         prevY: GROUND_HEIGHT,
         width: 30,
         height: 50,
@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // 关卡配置 (数据保持不变，通过逻辑动态抬高)
+    // 关卡配置
     const LEVELS = [
         // 关卡 1
         {
@@ -256,12 +256,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 清除游戏元素
     function clearGameElements() {
-        // 删除DOM元素
         document.querySelectorAll('.obstacle, .platform, .water, .fire, .ground-layer').forEach(element => {
             element.remove();
         });
-        
-        // 重置数据缓存
         levelObjects = {
             obstacles: [],
             platforms: [],
@@ -271,7 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
     
-    // --- 新增：创建地面元素 ---
+    // 创建地面元素
     function createGround() {
         const ground = document.createElement('div');
         ground.className = 'ground-layer';
@@ -280,7 +277,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ground.style.left = '0';
         ground.style.width = '100%';
         ground.style.height = `${GROUND_HEIGHT}px`;
-        // 地面样式：灰黑色 (#2c2c2c)，且位于背景层之上但在物体之下
         ground.style.backgroundColor = '#2c2c2c'; 
         ground.style.borderTop = '3px solid #1a1a1a';
         ground.style.zIndex = '1'; 
@@ -290,34 +286,27 @@ document.addEventListener('DOMContentLoaded', () => {
     // 加载关卡
     function loadLevel(levelIndex) {
         clearGameElements();
-        
-        // 1. 先创建地面
         createGround();
         
         containerWidth = gameContainer.offsetWidth;
         const level = LEVELS[levelIndex - 1];
         if (!level) return;
         
-        // 2. 加载障碍物 (所有Y坐标增加 GROUND_HEIGHT)
         level.obstacles.forEach(obs => {
-            // 计算调整后的Y
             const visualY = obs.y + GROUND_HEIGHT;
-
-            // DOM操作
             const obstacle = document.createElement('div');
             obstacle.classList.add('obstacle');
             obstacle.id = obs.id;
             obstacle.style.width = `${obs.width}px`;
             obstacle.style.height = `${obs.height}px`;
             obstacle.style.left = `${obs.x}px`;
-            obstacle.style.bottom = `${visualY}px`; // 使用调整后的高度
-            obstacle.style.zIndex = '2'; // 确保在地面之上
+            obstacle.style.bottom = `${visualY}px`;
+            obstacle.style.zIndex = '2';
             gameContainer.appendChild(obstacle);
             
-            // 数据缓存
             levelObjects.obstacles.push({
                 x: obs.x,
-                y: visualY, // 逻辑判定也要用调整后的高度
+                y: visualY,
                 width: obs.width,
                 height: obs.height,
                 right: obs.x + obs.width,
@@ -326,10 +315,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
         
-        // 3. 加载平台 (所有Y坐标增加 GROUND_HEIGHT)
         level.platforms.forEach(plat => {
             const visualY = plat.y + GROUND_HEIGHT;
-
             const platform = document.createElement('div');
             platform.classList.add('platform');
             platform.id = plat.id;
@@ -351,11 +338,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
         
-        // 4. 设置起点和终点
         const start = document.getElementById('start');
         const finish = document.getElementById('finish');
         
-        // 起点和终点标记也应该视觉上适应地面
         start.style.left = `${level.startX}px`;
         start.style.bottom = `${GROUND_HEIGHT}px`;
         
@@ -377,13 +362,10 @@ document.addEventListener('DOMContentLoaded', () => {
         currentLevelDisplay.textContent = levelIndex;
     }
     
-    // 创建水池 (所有Y坐标增加 GROUND_HEIGHT)
     function createWaters(level) {
         if (!level.waters) return;
-        
         level.waters.forEach(water => {
             const visualY = water.y + GROUND_HEIGHT;
-
             const waterElement = document.createElement('div');
             waterElement.classList.add('water');
             waterElement.id = water.id;
@@ -393,7 +375,6 @@ document.addEventListener('DOMContentLoaded', () => {
             waterElement.style.bottom = `${visualY}px`;
             waterElement.style.zIndex = '2';
             gameContainer.appendChild(waterElement);
-            
             levelObjects.waters.push({
                 x: water.x,
                 y: visualY,
@@ -406,13 +387,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // 创建火池 (所有Y坐标增加 GROUND_HEIGHT)
     function createFires(level) {
         if (!level.fires) return;
-        
         level.fires.forEach(fire => {
             const visualY = fire.y + GROUND_HEIGHT;
-
             const fireElement = document.createElement('div');
             fireElement.classList.add('fire');
             fireElement.id = fire.id;
@@ -422,7 +400,6 @@ document.addEventListener('DOMContentLoaded', () => {
             fireElement.style.bottom = `${visualY}px`;
             fireElement.style.zIndex = '2';
             gameContainer.appendChild(fireElement);
-            
             levelObjects.fires.push({
                 x: fire.x,
                 y: visualY,
@@ -457,6 +434,11 @@ document.addEventListener('DOMContentLoaded', () => {
         gameOver.style.display = 'none';
         levelComplete.style.display = 'none';
         
+        // 确保关卡开始时按钮和玩家是可见的
+        if(switchPlayerBtn) switchPlayerBtn.style.display = 'flex';
+        player1Element.style.display = 'block';
+        player2Element.style.display = 'block';
+        
         updatePlayersDisplay();
         startTimer();
         requestAnimationFrame(gameLoop);
@@ -469,7 +451,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 重置玩家1
         player1State.x = startX;
-        player1State.y = GROUND_HEIGHT; // 修改：出生在地面高度
+        player1State.y = GROUND_HEIGHT;
         player1State.prevY = GROUND_HEIGHT;
         player1State.velocityY = 0;
         player1State.jumpCount = 0;
@@ -482,7 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 重置玩家2
         player2State.x = startX + 40;
-        player2State.y = GROUND_HEIGHT; // 修改：出生在地面高度
+        player2State.y = GROUND_HEIGHT;
         player2State.prevY = GROUND_HEIGHT;
         player2State.velocityY = 0;
         player2State.jumpCount = 0;
@@ -574,16 +556,24 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 更新玩家显示位置
     function updatePlayersDisplay() {
-        player1Element.style.left = `${player1State.x}px`;
-        player1Element.style.bottom = `${player1State.y}px`;
-        player1Element.style.zIndex = '10'; // 确保玩家在最上层
+        // --- 修改：如果已到达终点，隐藏DOM ---
+        if (player1State.reachedFinish) {
+            player1Element.style.display = 'none';
+        } else {
+            player1Element.style.left = `${player1State.x}px`;
+            player1Element.style.bottom = `${player1State.y}px`;
+            player1Element.style.zIndex = '10';
+            player1Element.style.opacity = player1State.isActive ? "1" : "0.5";
+        }
         
-        player2Element.style.left = `${player2State.x}px`;
-        player2Element.style.bottom = `${player2State.y}px`;
-        player2Element.style.zIndex = '10';
-        
-        player1Element.style.opacity = player1State.isActive ? "1" : "0.5";
-        player2Element.style.opacity = player2State.isActive ? "1" : "0.5";
+        if (player2State.reachedFinish) {
+            player2Element.style.display = 'none';
+        } else {
+            player2Element.style.left = `${player2State.x}px`;
+            player2Element.style.bottom = `${player2State.y}px`;
+            player2Element.style.zIndex = '10';
+            player2Element.style.opacity = player2State.isActive ? "1" : "0.5";
+        }
     }
     
     // 显示关卡选择界面
@@ -687,7 +677,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (playerState.onPlatform) {
             playerState.onPlatform = false;
             playerState.platformId = null;
-            // 修改判断：如果在地面以上，则不在地面
             if (playerState.y > GROUND_HEIGHT) {
                 playerState.onGround = false;
             }
@@ -739,7 +728,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (e.code === 'Space') {
             const switchBtn = document.getElementById('switch-player-btn');
-            if(switchBtn) switchBtn.click();
+            // 如果按钮是隐藏的，则不允许通过空格键切换
+            if(switchBtn && switchBtn.style.display !== 'none') switchBtn.click();
         }
     });
     
@@ -751,7 +741,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 通用玩家更新逻辑
     function updatePlayerPhysics(playerState, leftKey, rightKey, element) {
-        if (!playerState.isActive) return;
+        // --- 修改：如果已到达终点，不再更新物理 ---
+        if (!playerState.isActive || playerState.reachedFinish) return;
 
         playerState.prevY = playerState.y;
         
@@ -778,8 +769,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 平台检测
         checkPlatforms(playerState);
         
-        // --- 修改：地面检测 ---
-        // 使用 GROUND_HEIGHT 代替 0
+        // 地面检测
         if (playerState.y <= GROUND_HEIGHT) {
             playerState.y = GROUND_HEIGHT;
             playerState.velocityY = 0;
@@ -819,6 +809,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updatePlayer2();
         updatePlayersDisplay();
         
+        // --- 修改：处理终点逻辑 ---
         if (player1State.isActive) {
             if (checkObstacleCollisions(player1State) || checkWaterCollisions(player1State)) {
                 player1State.isActive = false;
@@ -827,9 +818,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (checkFinishCollision(player1State)) {
                 player1State.reachedFinish = true;
                 updatePlayerStatusDisplay();
+                // 玩家1到达终点：如果玩家2还没到，隐藏切换按钮，并确保控制权转给玩家2
                 if (!player2State.reachedFinish) {
-                    const btn = document.getElementById('switch-player-btn');
-                    if (btn) btn.click();
+                    if (switchPlayerBtn) {
+                        // 强制切换控制权给P2（假设按钮当前是P1状态）
+                        if (switchPlayerBtn.textContent === 'P1') switchPlayerBtn.click();
+                        // 隐藏按钮
+                        switchPlayerBtn.style.display = 'none';
+                    }
                 }
             }
         }
@@ -842,9 +838,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (checkFinishCollision(player2State)) {
                 player2State.reachedFinish = true;
                 updatePlayerStatusDisplay();
+                // 玩家2到达终点：如果玩家1还没到，隐藏切换按钮，并确保控制权转给玩家1
                 if (!player1State.reachedFinish) {
-                    const btn = document.getElementById('switch-player-btn');
-                    if (btn) btn.click();
+                    if (switchPlayerBtn) {
+                        // 强制切换控制权给P1（假设按钮当前是P2状态）
+                        if (switchPlayerBtn.textContent === 'P2') switchPlayerBtn.click();
+                        // 隐藏按钮
+                        switchPlayerBtn.style.display = 'none';
+                    }
                 }
             }
         }
@@ -943,7 +944,7 @@ document.addEventListener('DOMContentLoaded', () => {
         p1.classList.add('player-active');
         
         document.addEventListener('keydown', function(e) {
-            if (e.code === 'Space' && btn) {
+            if (e.code === 'Space' && btn && btn.style.display !== 'none') {
                 btn.click();
                 e.preventDefault();
             }
