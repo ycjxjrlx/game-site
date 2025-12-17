@@ -36,7 +36,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let timerInterval;
     let isLevelComplete = false;
     let debugMode = false;
-    let containerWidth = 800; 
+    
+    // --- 修复关键1：当前控制的玩家ID (全局变量) ---
+    let activePlayer = 1; 
+
+    // 锁定游戏世界物理宽度为 800
+    const GAME_WIDTH = 800; 
     
     // 地面高度设置
     const GROUND_HEIGHT = 140; 
@@ -280,8 +285,8 @@ document.addEventListener('DOMContentLoaded', () => {
         clearGameElements();
         createGround();
         
-        const currentWidth = gameContainer.offsetWidth;
-        containerWidth = currentWidth > 0 ? currentWidth : 800;
+        // 使用固定物理宽度
+        containerWidth = GAME_WIDTH;
         
         const level = LEVELS[levelIndex - 1];
         if (!level) return;
@@ -408,10 +413,29 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
+    // --- 新增：更新切换按钮和玩家UI状态的辅助函数 ---
+    function updateActivePlayerUI() {
+        if (!switchPlayerBtn) return;
+        
+        // 更新按钮文字和样式
+        switchPlayerBtn.textContent = 'P' + activePlayer;
+        switchPlayerBtn.className = 'switch-player-btn player' + activePlayer + '-border';
+        
+        // 更新玩家发光状态
+        if (activePlayer === 1) {
+            player1Element.classList.add('player-active');
+            player2Element.classList.remove('player-active');
+        } else {
+            player2Element.classList.add('player-active');
+            player1Element.classList.remove('player-active');
+        }
+    }
+
     function startLevel(levelIndex) {
         stopTimer();
         currentLevel = levelIndex;
         
+        // 重置按键
         for (let key in keys) {
             keys[key] = false;
         }
@@ -432,6 +456,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         gameOver.style.display = 'none';
         levelComplete.style.display = 'none';
+        
+        // --- 修复重点2：重置默认玩家为P1 ---
+        activePlayer = 1;
+        updateActivePlayerUI(); // 立即刷新UI
         
         if(switchPlayerBtn) switchPlayerBtn.style.display = 'flex';
         player1Element.style.display = 'block';
@@ -597,11 +625,8 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     }
 
-    // --- 新增：垂直碰撞检测（踩头） ---
     function checkPlayerLandingOnPlayer(playerState, otherPlayer) {
-        // 如果对方已经通关或挂了，则不发生碰撞
         if (!otherPlayer.isActive || otherPlayer.reachedFinish) return false;
-        // 只有下落时才检测踩头
         if (playerState.velocityY > 0) return false; 
 
         const myLeft = playerState.x;
@@ -613,22 +638,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const otherLeft = otherPlayer.x;
         const otherRight = otherPlayer.x + otherPlayer.width;
 
-        // 水平方向必须有重叠（稍微放宽2px，防止边缘判定抖动）
         const hasHorizontalOverlap = 
             myRight > otherLeft + 2 && 
             myLeft < otherRight - 2;
         
-        // 垂直穿过检测：上一帧在对方头顶上方（或刚好接触），当前帧落到了对方头顶下方
         const landedOnTop = 
-            myPrevBottom >= otherTop - 5 && // 允许5px的容错，处理快速移动或浮点误差
+            myPrevBottom >= otherTop - 5 && 
             myBottom <= otherTop;
 
         if (hasHorizontalOverlap && landedOnTop) {
-            // 修正位置：站在对方头顶
             playerState.y = otherTop;
             playerState.velocityY = 0;
             playerState.onGround = true;
-            playerState.onPlatform = true; // 标记为站在平台上
+            playerState.onPlatform = true; 
             return true;
         }
         return false;
@@ -799,8 +821,6 @@ document.addEventListener('DOMContentLoaded', () => {
         playerState.y += playerState.velocityY;
         
         checkPlatforms(playerState);
-        
-        // --- 调用垂直碰撞检测 ---
         checkPlayerLandingOnPlayer(playerState, otherPlayer);
 
         if (playerState.y <= GROUND_HEIGHT) {
@@ -987,23 +1007,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (playerJump) { playerJump.style.width = '60px'; playerJump.style.height = '60px'; }
         }
         
-        let activePlayer = 1;
+        let activePlayerRef = 1; // 临时变量，但setupMobileControls应该用全局activePlayer
         p1.classList.add('player-active');
         
         if (switchPlayerBtn) {
             switchPlayerBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 activePlayer = activePlayer === 1 ? 2 : 1;
-                switchPlayerBtn.textContent = 'P' + activePlayer;
-                switchPlayerBtn.className = 'switch-player-btn player' + activePlayer + '-border';
-                
-                if (activePlayer === 1) {
-                    p1.classList.add('player-active');
-                    p2.classList.remove('player-active');
-                } else {
-                    p2.classList.add('player-active');
-                    p1.classList.remove('player-active');
-                }
+                updateActivePlayerUI();
             });
         }
         
