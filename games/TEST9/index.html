@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SATURN // CLEAN VISUAL</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0b0f19; 
+        }
+
+        /* 全息背景纹理 (保留作为环境氛围，如需纯黑可删除此块) */
+        .holographic-bg {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            opacity: 0.4;
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(20, 30, 48, 0) 0%, rgba(0, 0, 0, 0.6) 100%),
+                url('data:image/svg+xml;utf8,<svg width="100%25" height="100%25" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse"><path d="M 100 0 L 0 0 0 100" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/></pattern></defs><rect width="100%25" height="100%25" fill="url(%23grid)" /><path d="M0 600 Q 400 300 800 500 T 1600 400" stroke="rgba(100, 149, 237, 0.1)" fill="none" stroke-width="1.5"/><path d="M0 300 Q 500 100 1200 300" stroke="rgba(100, 149, 237, 0.1)" fill="none" stroke-width="1.5"/><circle cx="300" cy="500" r="200" stroke="rgba(100, 149, 237, 0.05)" fill="none" stroke-dasharray="5,5"/></svg>');
+            z-index: 0;
+        }
+
+        #canvas-container {
+            position: absolute;
+            z-index: 1;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* 隐藏摄像头元素但保持在DOM中以便JS读取 */
+        #video-preview {
+            position: absolute;
+            top: 0; left: 0;
+            width: 1px; height: 1px;
+            opacity: 0;
+            pointer-events: none;
+            z-index: -1;
+        }
+    </style>
+    
+    <!-- Three.js & MediaPipe -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+    <div class="holographic-bg"></div>
+    
+    <!-- 视频元素必须存在用于捕捉，但已隐藏 -->
+    <video id="video-preview" playsinline></video>
+    
+    <div id="canvas-container"></div>
+
+    <script>
+        // ==========================================
+        // PART 1: 视觉系统
+        // ==========================================
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x0b0f19, 0.002);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(0, 0, 14); 
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        const colors = {
+            gold: new THREE.Color(0xdecba4),
+            brown: new THREE.Color(0x8a7045),
+            shadow: new THREE.Color(0x151b29),
+            ring: new THREE.Color(0xe0e6eb)
+        };
+
+        // 光源：右前上方
+        const lightDir = new THREE.Vector3(1.5, 0.2, 2.0).normalize();
+
+        // --- 构建土星 ---
+        const group = new THREE.Group();
+        scene.add(group);
+
+        // 1. 本体粒子
+        const sphereGeo = new THREE.BufferGeometry();
+        const sphereCount = 35000;
+        const spherePos = []; const sphereColors = [];
+        const colorHelper = new THREE.Color();
+
+        for(let i = 0; i < sphereCount; i++) {
+            const v = new THREE.Vector3(
+                Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1
+            ).normalize().multiplyScalar(3.5);
+            spherePos.push(v.x, v.y, v.z);
+            
+            const band = Math.sin(v.y * 6.0) + Math.cos(v.y * 14.0) * 0.3 + (Math.random()-0.5)*0.2;
+            let baseColor = (band > 0.4) ? colors.gold : (band < -0.2 ? colors.brown : colors.gold.clone().lerp(colors.brown, 0.5));
+            
+            const intensity = Math.max(0, v.clone().normalize().dot(lightDir));
+            
+            colorHelper.copy(colors.shadow).lerp(baseColor, (intensity + 0.3) * 0.9);
+            if (intensity > 0.5 && Math.random() > 0.85) colorHelper.addScalar(0.1);
+            sphereColors.push(colorHelper.r, colorHelper.g, colorHelper.b);
+        }
+        sphereGeo.setAttribute('position', new THREE.Float32BufferAttribute(spherePos, 3));
+        sphereGeo.setAttribute('color', new THREE.Float32BufferAttribute(sphereColors, 3));
+        const planet = new THREE.Points(sphereGeo, new THREE.PointsMaterial({
+            size: 0.04, vertexColors: true, transparent: true, opacity: 1.0
+        }));
+        group.add(planet);
+
+        // 2. 光环粒子
+        const ringGeo = new THREE.BufferGeometry();
+        const ringCount = 70000;
+        const ringPos = []; const ringColors = [];
+
+        for(let i = 0; i < ringCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const r = (Math.random() < 0.65) ? 4.5 + Math.random() * 2.3 : 7.3 + Math.random() * 1.5;
+            const x = r * Math.cos(angle);
+            const z = r * Math.sin(angle);
+            const y = (Math.random() - 0.5) * 0.15;
+            ringPos.push(x, y, z);
+
+            const dist = (x * lightDir.x + z * lightDir.z); 
+            let brightness = 0.5 + dist * 0.4 + (Math.random() - 0.5) * 0.3;
+            colorHelper.copy(colors.ring).multiplyScalar(Math.max(0.2, brightness));
+            if (r > 8.5) colorHelper.multiplyScalar(0.5);
+            ringColors.push(colorHelper.r, colorHelper.g, colorHelper.b);
+        }
+        ringGeo.setAttribute('position', new THREE.Float32BufferAttribute(ringPos, 3));
+        ringGeo.setAttribute('color', new THREE.Float32BufferAttribute(ringColors, 3));
+        const rings = new THREE.Points(ringGeo, new THREE.PointsMaterial({
+            size: 0.03, vertexColors: true, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false
+        }));
+        group.add(rings);
+
+        // ==========================================
+        // PART 2: 核心控制逻辑
+        // ==========================================
+        
+        let targetScale = 0.8;      
+        let targetRotX = 0.4;       
+        let currentScale = 0.8;     
+        let currentRotX = 0.4;      
+        
+        let isHandDetected = false; 
+        let autoIdleTime = 0;       
+
+        // MediaPipe 设置
+        const videoElement = document.getElementById('video-preview');
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.6,
+            minTrackingConfidence: 0.6 
+        });
+
+        hands.onResults(onResults);
+
+        const cameraUtils = new Camera(videoElement, {
+            onFrame: async () => { await hands.send({image: videoElement}); },
+            width: 320, height: 240
+        });
+        cameraUtils.start();
+
+        function onResults(results) {
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                isHandDetected = true;
+                const hand = results.multiHandLandmarks[0];
+
+                // 计算拇指(4)和食指(8)的距离用于缩放
+                const p1 = hand[4];
+                const p2 = hand[8];
+                const dist = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+                
+                const normDist = Math.max(0, Math.min(1, (dist - 0.02) / 0.25));
+                targetScale = 0.3 + normDist * 1.3; 
+
+                // 使用中指根部(9)的Y坐标控制上下旋转
+                const y = hand[9].y;
+                const normY = Math.max(0, Math.min(1, (y - 0.1) / 0.8));
+                targetRotX = 0.8 - normY * 1.2; 
+            } else {
+                isHandDetected = false;
+            }
+        }
+
+        // ==========================================
+        // PART 3: 动画循环
+        // ==========================================
+        let time = 0;
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.002;
+
+            // 自动巡航模式
+            if (!isHandDetected) {
+                autoIdleTime += 0.02;
+                targetScale = 0.8 + Math.sin(autoIdleTime) * 0.1;
+                targetRotX = 0.4 + Math.cos(autoIdleTime * 0.5) * 0.15;
+            }
+
+            // 平滑插值
+            const lerpFactor = 0.08; 
+            currentScale += (targetScale - currentScale) * lerpFactor;
+            currentRotX += (targetRotX - currentRotX) * lerpFactor;
+
+            group.scale.set(currentScale, currentScale, currentScale);
+            group.rotation.x = currentRotX;
+            
+            group.rotation.y += 0.001; 
+            rings.rotation.y -= 0.0005;
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

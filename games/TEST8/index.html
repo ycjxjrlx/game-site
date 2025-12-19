@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Landscape // Clean</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #000000; 
+        }
+        canvas { display: block; }
+
+        /* 隐藏视频源，但保留在DOM中供JS读取 */
+        #input-video {
+            position: absolute;
+            top: 0; left: 0;
+            width: 1px; height: 1px;
+            opacity: 0;
+            pointer-events: none;
+            z-index: -1;
+        }
+    </style>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+    <video id="input-video" playsinline muted autoplay></video>
+
+    <script>
+        // ================= 配置参数 =================
+        const CONFIG = {
+            particleCount: 350000, 
+            rangeX: 120,           
+            rangeZ: 140,           
+            lineCount: 400,        
+            colorRiver: new THREE.Color('rgba(253,232,3,0.94)'), 
+            colorMtBase: new THREE.Color('#002044'), 
+            colorMtTop: new THREE.Color('#00fff7')   
+        };
+
+        // ================= 1. Three.js 场景 =================
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color('#000000');
+        scene.fog = new THREE.FogExp2(0x000000, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 500);
+        camera.position.set(0, 15, 40); 
+        camera.lookAt(0, 0, -20);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+        document.body.appendChild(renderer.domElement);
+
+        // ================= 2. 几何体生成 =================
+        const geometry = new THREE.BufferGeometry();
+        const positions = [];
+        const randoms = []; 
+        const lineIndices = []; 
+
+        const pointsPerLine = Math.floor(CONFIG.particleCount / CONFIG.lineCount);
+
+        for (let i = 0; i < CONFIG.lineCount; i++) {
+            const z = (i / CONFIG.lineCount - 0.5) * CONFIG.rangeZ;
+            for (let j = 0; j < pointsPerLine; j++) {
+                const x = (j / pointsPerLine - 0.5) * CONFIG.rangeX;
+                positions.push(x, 0, z);
+                randoms.push(Math.random(), Math.random(), Math.random());
+                lineIndices.push(i / CONFIG.lineCount);
+            }
+        }
+
+        // 悬浮光尘
+        const dustCount = 20000;
+        for(let i=0; i<dustCount; i++) {
+            positions.push(
+                (Math.random()-0.5)*CONFIG.rangeX,
+                Math.random()*30 + 10,
+                (Math.random()-0.5)*CONFIG.rangeZ
+            );
+            randoms.push(Math.random(), Math.random(), Math.random());
+            lineIndices.push(-1.0); 
+        }
+
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setAttribute('aRandom', new THREE.Float32BufferAttribute(randoms, 3));
+        geometry.setAttribute('aLine', new THREE.Float32BufferAttribute(lineIndices, 1));
+
+        // ================= 3. Shader =================
+        const vertexShader = `
+            uniform float uTime;
+            uniform float uTerrainHeight;
+
+            attribute vec3 aRandom;
+            attribute float aLine;
+
+            varying float vType; 
+            varying float vHeight;
+            varying float vIntensity;
+
+            // 简化的噪声函数
+            vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+            vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+            vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
+            float snoise(vec2 v) {
+                const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+                vec2 i  = floor(v + dot(v, C.yy) );
+                vec2 x0 = v - i + dot(i, C.xx);
+                vec2 i1; i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+                vec4 x12 = x0.xyxy + C.xxzz; x12.xy -= i1;
+                i = mod289(i);
+                vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 )) + i.x + vec3(0.0, i1.x, 1.0 ));
+                vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+                m = m*m ; m = m*m ;
+                vec3 x = 2.0 * fract(p * C.www) - 1.0;
+                vec3 h = abs(x) - 0.5;
+                vec3 ox = floor(x + 0.5);
+                vec3 a0 = x - ox;
+                m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
+                vec3 g;
+                g.x  = a0.x  * x0.x  + h.x  * x0.y;
+                g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+                return 130.0 * dot(m, g);
+            }
+
+            void main() {
+                vec3 pos = position;
+
+                if (aLine < -0.5) {
+                    vType = 3.0;
+                    float t = uTime * 0.2 + aRandom.x * 10.0;
+                    pos.x += sin(t) * 5.0;
+                    pos.z += cos(t * 0.7) * 5.0;
+                    pos.y += sin(t * 1.5) * 2.0;
+                    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                    gl_Position = projectionMatrix * mvPosition;
+                    gl_PointSize = (2.0) * (30.0 / -mvPosition.z);
+                    return;
+                }
+
+                float riverCurve = sin(pos.z * 0.08) * 12.0 + sin(pos.z * 0.2) * 4.0;
+                float distToRiver = abs(pos.x - riverCurve);
+
+                float height = 0.0;
+                float pointSize = 0.0;
+
+                if (distToRiver < 3.5) {
+                    vType = 0.0;
+                    float flow = snoise(vec2(pos.x * 0.5, pos.z * 0.2 - uTime * 0.8));
+                    height = flow * 0.8;
+                    pointSize = 3.0 * (1.0 - distToRiver / 3.5);
+                    vIntensity = 0.8 + 0.5 * sin(uTime * 5.0 + aRandom.x * 20.0);
+                }
+                else if (distToRiver < 10.0) {
+                    vType = 2.0;
+                    pointSize = 0.0; 
+                }
+                else {
+                    vType = 1.0;
+                    float mDist = distToRiver - 10.0;
+                    float n1 = snoise(vec2(pos.x * 0.05, pos.z * 0.08));
+                    float n2 = snoise(vec2(pos.x * 0.15, pos.z * 0.15));
+
+                    height = (abs(n1) * 15.0 + n2 * 5.0) * (mDist * 0.08);
+                    height = clamp(height, 0.0, 35.0);
+
+                    // 高度控制
+                    height *= uTerrainHeight;
+
+                    pointSize = 1.5 + height * 0.08;
+                    
+                    float linePattern = sin(aLine * 300.0);
+                    if (linePattern > 0.8) {
+                        pointSize *= 1.5;
+                        vIntensity = 1.5;
+                    } else {
+                        vIntensity = 0.8;
+                    }
+                }
+
+                pos.y = height;
+                vHeight = height;
+
+                vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                gl_Position = projectionMatrix * mvPosition;
+                gl_PointSize = pointSize * (40.0 / -mvPosition.z);
+            }
+        `;
+
+        const fragmentShader = `
+            uniform vec3 uColorRiver;
+            uniform vec3 uColorMtBase;
+            uniform vec3 uColorMtTop;
+
+            varying float vType;
+            varying float vHeight;
+            varying float vIntensity;
+
+            void main() {
+                if (vType > 1.5 && vType < 2.5) discard;
+                vec2 uv = gl_PointCoord.xy - 0.5;
+                float d = length(uv);
+                if (d > 0.5) discard;
+                float alpha = 1.0 - smoothstep(0.2, 0.5, d);
+
+                vec3 color = vec3(0.0);
+
+                if (vType < 0.5) {
+                    color = uColorRiver;
+                    color += vec3(0.4, 0.4, 0.2);
+                } else if (vType > 2.5) {
+                    color = vec3(1.0);
+                    alpha *= 0.5;
+                } else {
+                    float hFactor = clamp(vHeight / 25.0, 0.0, 1.0);
+                    color = mix(uColorMtBase, uColorMtTop, hFactor);
+                    color *= vIntensity;
+                    if (hFactor > 0.8) color += vec3(0.2);
+                }
+                gl_FragColor = vec4(color, alpha);
+            }
+        `;
+
+        const uniforms = {
+            uTime: { value: 0 },
+            uTerrainHeight: { value: 0.5 }, 
+            uColorRiver: { value: CONFIG.colorRiver },
+            uColorMtBase: { value: CONFIG.colorMtBase },
+            uColorMtTop: { value: CONFIG.colorMtTop }
+        };
+
+        const material = new THREE.ShaderMaterial({
+            vertexShader, fragmentShader, uniforms,
+            transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+        });
+
+        const particleSystem = new THREE.Points(geometry, material);
+        const worldGroup = new THREE.Group();
+        worldGroup.add(particleSystem);
+        scene.add(worldGroup);
+
+        // ================= 4. 控制逻辑 (防抖优化版) =================
+        
+        let isHandDetected = false;
+        
+        // 目标值
+        let targetTerrainHeight = 0.5; 
+        let targetGlobalScale = 1.0;   
+
+        // 状态保持变量
+        let lastHandDetectedTime = 0;
+        let lastKnownHeight = 0.5;
+        let lastKnownScale = 1.0;
+        const GRACE_PERIOD = 2000; // 毫秒：丢失手势后，保持最后状态的时间
+
+        // 当前值 (Lerp)
+        let currentTerrainHeight = 0.5;
+        let currentGlobalScale = 1.0;
+        let autoIdleTime = 0;
+
+        const videoElement = document.getElementById('input-video');
+
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 0,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        hands.onResults((results) => {
+            const now = performance.now();
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                isHandDetected = true;
+                lastHandDetectedTime = now;
+
+                const hand = results.multiHandLandmarks[0];
+
+                // --- 逻辑 1: 高度控制 (Y轴) ---
+                const y = hand[9].y; 
+                
+                // 【优化点 1】映射调整：
+                // 只要 y > 0.95 (靠近底部但还没出去)，就视为完全平原 (Height = 0)
+                // 这样用户不需要把手移出画面就能达到"最平"的效果
+                let safeY = Math.min(y, 0.95); // 截断
+                let normY = safeY / 0.95;      // 归一化 0~1
+                
+                // 手在顶(0) -> Height 大; 手在底(1) -> Height 0
+                targetTerrainHeight = (1.0 - normY) * 2.0; 
+
+                // --- 逻辑 2: 缩放 (捏合) ---
+                const p1 = hand[4]; 
+                const p2 = hand[8]; 
+                const dist = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+                const normDist = Math.max(0, Math.min(1, (dist - 0.02) / 0.25));
+                targetGlobalScale = 0.6 + normDist * 0.8; 
+
+                // 记录最后已知状态
+                lastKnownHeight = targetTerrainHeight;
+                lastKnownScale = targetGlobalScale;
+
+            } else {
+                isHandDetected = false;
+            }
+        });
+
+        const cameraUtils = new Camera(videoElement, {
+            onFrame: async () => { await hands.send({image: videoElement}); },
+            width: 320, height: 240
+        });
+        cameraUtils.start();
+
+        // ================= 5. 动画循环 =================
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const t = clock.getElapsedTime();
+            const now = performance.now();
+
+            // 自动模式判断逻辑
+            if (!isHandDetected) {
+                // 【优化点 2】 防抖机制
+                // 如果手势丢失时间小于容错期 (GRACE_PERIOD)，则保持最后的状态，不进入Auto模式
+                // 防止手放到屏幕底部边缘丢失时突然跳变
+                if (now - lastHandDetectedTime < GRACE_PERIOD) {
+                    targetTerrainHeight = lastKnownHeight;
+                    targetGlobalScale = lastKnownScale;
+                } else {
+                    // 真的超时了，才进入自动演示
+                    autoIdleTime += 0.005;
+                    targetTerrainHeight = 0.6 + Math.sin(autoIdleTime) * 0.4;
+                    targetGlobalScale = 1.0 + Math.sin(autoIdleTime * 0.7) * 0.1;
+                }
+            } else {
+                // 手势存在时，重置自动计时器，保证平滑切换
+                // 使下次进入自动模式时相位连续（可选，视喜好而定）
+                // autoIdleTime = 0; 
+            }
+
+            // 平滑插值 (Lerp)
+            const lerpFactor = 0.08;
+            currentTerrainHeight += (targetTerrainHeight - currentTerrainHeight) * lerpFactor;
+            currentGlobalScale += (targetGlobalScale - currentGlobalScale) * lerpFactor;
+
+            // 更新 Shader
+            uniforms.uTime.value = t;
+            uniforms.uTerrainHeight.value = currentTerrainHeight;
+
+            // 更新 缩放
+            worldGroup.scale.set(currentGlobalScale, currentGlobalScale, currentGlobalScale);
+            worldGroup.rotation.y = Math.sin(t * 0.05) * 0.05;
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
