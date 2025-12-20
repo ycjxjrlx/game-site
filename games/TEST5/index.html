@@ -1,503 +1,377 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>横板跳跃游戏 - 双人模式</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Arial', sans-serif;
-            background-color: #2c3e50;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-            color: white;
-        }
-        
-        #game-container {
-            position: relative;
-            width: 800px;
-            height: 400px;
-            background-color: #34495e;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.5);
-        }
-        
-        #player {
-            position: absolute;
-            width: 30px;
-            height: 50px;
-            background-color: #e74c3c;
-            border-radius: 5px;
-            z-index: 20;
-            box-shadow: 0px 0px 10px rgba(231, 76, 60, 0.7);
-            transition: all 0.3s ease;
-        }
-        
-        #player2 {
-            position: absolute;
-            width: 30px;
-            height: 50px;
-            background-color: #4e8df2;
-            border-radius: 5px;
-            z-index: 20;
-            box-shadow: 0px 0px 10px rgba(78, 141, 242, 0.7);
-            transition: all 0.3s ease;
-        }
-        
-        .obstacle {
-            position: absolute;
-            background-color: #c0392b;
-            z-index: 5;
-            box-shadow: 0px 0px 10px rgba(192, 57, 43, 0.8);
-            border: 2px solid #922b21;
-            background-image: linear-gradient(135deg, #c0392b 25%, #922b21 25%, #922b21 50%, #c0392b 50%, #c0392b 75%, #922b21 75%, #922b21 100%);
-            background-size: 14px 14px;
-        }
-        
-        .obstacle::before {
-            content: "";
-            position: absolute;
-            top: -10px;
-            left: 0;
-            width: 100%;
-            height: 10px;
-            background-image: conic-gradient(from 135deg at 50% 0%, #922b21 90deg, transparent 90deg);
-            background-size: 10px 10px;
-        }
-        
-        .platform {
-            position: absolute;
-            background-color: #8B4513; /* 褐色平台 */
-            z-index: 5;
-            box-shadow: 0px 0px 10px rgba(139, 69, 19, 0.7);
-            border-radius: 3px;
-            background-image: linear-gradient(90deg, #8B4513 90%, #6e3809 100%);
-        }
-        
-        .water {
-            position: absolute;
-            background-color: #3498db;
-            z-index: 5;
-            box-shadow: 0px 0px 10px rgba(52, 152, 219, 0.7);
-            opacity: 0.8;
-            background-image: linear-gradient(0deg, #3498db 85%, #5dade2 100%);
-            border-radius: 0 0 5px 5px;
-            animation: waterWave 2s infinite ease-in-out;
-        }
-        
-        @keyframes waterWave {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(2px); }
-        }
-        
-        .fire {
-            position: absolute;
-            background-color: #e74c3c;
-            z-index: 5;
-            box-shadow: 0px 0px 10px rgba(231, 76, 60, 0.9);
-            opacity: 0.9;
-            background-image: linear-gradient(0deg, #e74c3c 60%, #f39c12 85%, #f1c40f 100%);
-            border-radius: 0 0 5px 5px;
-            animation: fireFlicker 0.5s infinite alternate;
-        }
-        
-        @keyframes fireFlicker {
-            0% { opacity: 0.8; box-shadow: 0px 0px 10px rgba(231, 76, 60, 0.7); }
-            100% { opacity: 1; box-shadow: 0px 0px 15px rgba(231, 76, 60, 1); }
-        }
-        
-        #start {
-            position: absolute;
-            width: 40px;
-            height: 40px;
-            background-color: #2ecc71;
-            border-radius: 50%;
-            bottom: 0;
-            left: 50px;
-            z-index: 10;
-            box-shadow: 0px 0px 10px rgba(46, 204, 113, 0.7);
-        }
-        
-        #finish {
-            position: absolute;
-            width: 40px;
-            height: 40px;
-            background-color: #f1c40f;
-            border-radius: 50%;
-            bottom: 0;
-            right: 50px;
-            z-index: 10;
-            box-shadow: 0px 0px 10px rgba(241, 196, 15, 0.7);
-            animation: pulse 1.5s infinite;
-        }
-        
-        @keyframes pulse {
-            0% {
-                transform: scale(1);
-            }
-            50% {
-                transform: scale(1.1);
-            }
-            100% {
-                transform: scale(1);
-            }
-        }
-        
-        #game-over, #level-complete, #level-selection {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-            display: none;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-        }
-        
-        #game-over h2, #level-complete h2, #level-selection h2 {
-            color: white;
-            font-size: 28px;
-            margin-bottom: 20px;
-        }
-        
-        #game-over p, #level-complete p {
-            color: white;
-            font-size: 18px;
-            margin-bottom: 30px;
-        }
-        
-        .button {
-            padding: 10px 20px;
-            margin: 10px;
-            border: none;
-            border-radius: 5px;
-            background-color: #3498db;
-            color: white;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .button:hover {
-            background-color: #2980b9;
-            transform: scale(1.05);
-        }
-        
-        #level-buttons {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            max-width: 300px;
-            margin-bottom: 20px;
-        }
-        
-        .level-button {
-            width: 50px;
-            height: 50px;
-            margin: 5px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background-color: #3498db;
-            color: white;
-            font-size: 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .level-button:hover {
-            background-color: #2980b9;
-            transform: scale(1.1);
-        }
-        
-        .level-button.locked {
-            background-color: #7f8c8d;
-            cursor: not-allowed;
-        }
-        
-        #game-info {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            z-index: 50;
-            color: white;
-            font-size: 14px;
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 5px 10px;
-            border-radius: 5px;
-        }
-        
-        #player-controls {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            z-index: 50;
-            color: white;
-            font-size: 12px;
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 5px 10px;
-            border-radius: 5px;
-        }
-        
-        .player-status {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 5px;
-        }
-        
-        .player1-color {
-            color: #e74c3c;
-        }
-        
-        .player2-color {
-            color: #4e8df2;
-        }
-        
-        /* 新增：角色特性提示 */
-        .player-abilities {
-            margin-top: 10px;
-            font-size: 11px;
-            color: #bdc3c7;
-        }
-        
-        /* 移动端控制样式 */
-        #mobile-controls {
-            position: absolute;
-            bottom: 20px;
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            z-index: 50;
-            display: none; /* 默认隐藏，在移动设备上显示 */
-        }
-        
-        .direction-controls {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        
-        .jump-btn-container {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-        }
-        
-        .switch-player-btn {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background-color: rgba(0, 0, 0, 0.7);
-            border: 3px solid;
-            color: white;
-            font-size: 16px;
-            font-weight: bold;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            z-index: 100;
-            touch-action: manipulation;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
-            animation: pulse 1.5s infinite alternate;
-        }
-        
-        .switch-player-btn:hover {
-            transform: scale(1.1);
-            box-shadow: 0 0 15px rgba(0,0,0,0.7);
-        }
-        
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            100% { transform: scale(1.05); }
-        }
-        
-        .mobile-control-label {
-            font-weight: bold;
-            margin-bottom: 5px;
-            font-size: 14px;
-        }
-        
-        .control-btn {
-            background-color: rgba(0, 0, 0, 0.5);
-            border: 2px solid;
-            border-radius: 10px;
-            width: 50px;
-            height: 50px;
-            font-size: 18px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin: 5px;
-            cursor: pointer;
-            color: white;
-            touch-action: manipulation;
-            user-select: none;
-            -webkit-user-select: none;
-        }
-        
-        .player1-controls .control-btn, .player1-border {
-            border-color: #e74c3c;
-        }
-        
-        .player2-controls .control-btn, .player2-border {
-            border-color: #4e8df2;
-        }
-        
-        .jump-btn {
-            width: 60px;
-            height: 60px;
-            font-size: 20px;
-        }
-        
-        .direction-controls-inner {
-            display: flex;
-        }
-        
-        /* 响应式设计 */
-        @media (max-width: 800px) {
-            #game-container {
-                width: 100%;
-                height: 100vh;
-                border-radius: 0;
-            }
-            
-            #player-controls {
-                display: none; /* 在移动设备上隐藏键盘提示 */
-            }
-        }
-        
-        /* 角色发光效果 */
-        .player-active {
-            animation: glow 1.5s infinite alternate;
-        }
-        
-        @keyframes glow {
-            0% {
-                box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.7);
-            }
-            100% {
-                box-shadow: 0 0 20px 5px rgba(255, 255, 255, 0.9);
-            }
-        }
-        
-        /* 玩家1发光效果 */
-        #player.player-active {
-            animation: glow-player1 1.5s infinite alternate;
-        }
-        
-        @keyframes glow-player1 {
-            0% {
-                box-shadow: 0 0 10px 2px rgba(231, 76, 60, 0.7);
-            }
-            100% {
-                box-shadow: 0 0 20px 5px rgba(231, 76, 60, 0.9);
-            }
-        }
-        
-        /* 玩家2发光效果 */
-        #player2.player-active {
-            animation: glow-player2 1.5s infinite alternate;
-        }
-        
-        @keyframes glow-player2 {
-            0% {
-                box-shadow: 0 0 10px 2px rgba(78, 141, 242, 0.7);
-            }
-            100% {
-                box-shadow: 0 0 20px 5px rgba(78, 141, 242, 0.9);
-            }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>横板跳跃游戏 - 双人模式</title>
+<style>
+body {
+margin: 0;
+padding: 0;
+font-family: 'Arial', sans-serif;
+background-color: #2c3e50;
+display: flex;
+justify-content: center;
+align-items: center;
+height: 100vh;
+overflow: hidden;
+color: white;
+}
+#game-container {
+        position: relative;
+        width: 800px;
+        height: 400px;
+        background-color: #34495e;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.5);
+    }
+    
+    #player {
+        position: absolute;
+        width: 30px;
+        height: 50px;
+        background-color: #e74c3c;
+        border-radius: 5px;
+        z-index: 20;
+        /* 基础阴影 */
+        box-shadow: 0px 0px 10px rgba(231, 76, 60, 0.7);
+        /* 平滑移动过渡 */
+        transition: transform 0.1s, opacity 0.1s ease-out; 
+    }
+    
+    #player2 {
+        position: absolute;
+        width: 30px;
+        height: 50px;
+        background-color: #4e8df2;
+        border-radius: 5px;
+        z-index: 20;
+        /* 基础阴影 */
+        box-shadow: 0px 0px 10px rgba(78, 141, 242, 0.7);
+        /* 平滑移动过渡 */
+        transition: transform 0.1s, opacity 0.1s ease-out;
+    }
+    
+    /* 
+       核心修复：使用伪元素来实现发光效果。
+       这样发光动画（Animation）就不会和受伤闪烁动画（Animation）在同一个元素上冲突。
+    */
+    #player::after, #player2::after {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        border-radius: 5px;
+        z-index: -1; /* 放在玩家颜色图层下面 */
+        opacity: 0;  /* 默认隐藏 */
+        transition: opacity 0.3s;
+    }
+
+    /* 玩家1 激活时的发光层 */
+    #player.player-active::after {
+        opacity: 1;
+        animation: glow-player1 1.5s infinite alternate;
+    }
+
+    /* 玩家2 激活时的发光层 */
+    #player2.player-active::after {
+        opacity: 1;
+        animation: glow-player2 1.5s infinite alternate;
+    }
+    
+    /* 受伤闪烁效果 - 应用于主元素，这会同时影响主元素和伪元素（发光层）的透明度 */
+    .damage-effect {
+        animation: damageBlink 0.2s 4;
+    }
+    
+    /* 
+       其他原有样式保持不变 
+    */
+    
+    .obstacle {
+        position: absolute;
+        background-color: #c0392b;
+        z-index: 5;
+        box-shadow: 0px 0px 10px rgba(192, 57, 43, 0.8);
+        border: 2px solid #922b21;
+        background-image: linear-gradient(135deg, #c0392b 25%, #922b21 25%, #922b21 50%, #c0392b 50%, #c0392b 75%, #922b21 75%, #922b21 100%);
+        background-size: 14px 14px;
+    }
+    
+    .obstacle::before {
+        content: "";
+        position: absolute;
+        top: -10px;
+        left: 0;
+        width: 100%;
+        height: 10px;
+        background-image: conic-gradient(from 135deg at 50% 0%, #922b21 90deg, transparent 90deg);
+        background-size: 10px 10px;
+    }
+    
+    .platform {
+        position: absolute;
+        background-color: #8B4513; 
+        z-index: 5;
+        box-shadow: 0px 0px 10px rgba(139, 69, 19, 0.7);
+        border-radius: 3px;
+        background-image: linear-gradient(90deg, #8B4513 90%, #6e3809 100%);
+    }
+    
+    .water {
+        position: absolute;
+        background-color: #3498db;
+        z-index: 5;
+        box-shadow: 0px 0px 10px rgba(52, 152, 219, 0.7);
+        opacity: 0.8;
+        background-image: linear-gradient(0deg, #3498db 85%, #5dade2 100%);
+        border-radius: 0 0 5px 5px;
+        animation: waterWave 2s infinite ease-in-out;
+    }
+    
+    @keyframes waterWave {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(2px); }
+    }
+    
+    .fire {
+        position: absolute;
+        background-color: #e74c3c;
+        z-index: 5;
+        box-shadow: 0px 0px 10px rgba(231, 76, 60, 0.9);
+        opacity: 0.9;
+        background-image: linear-gradient(0deg, #e74c3c 60%, #f39c12 85%, #f1c40f 100%);
+        border-radius: 0 0 5px 5px;
+        animation: fireFlicker 0.5s infinite alternate;
+    }
+    
+    @keyframes fireFlicker {
+        0% { opacity: 0.8; box-shadow: 0px 0px 10px rgba(231, 76, 60, 0.7); }
+        100% { opacity: 1; box-shadow: 0px 0px 15px rgba(231, 76, 60, 1); }
+    }
+    
+    #start {
+        position: absolute;
+        width: 40px;
+        height: 40px;
+        background-color: #2ecc71;
+        border-radius: 50%;
+        bottom: 0;
+        left: 50px;
+        z-index: 10;
+        box-shadow: 0px 0px 10px rgba(46, 204, 113, 0.7);
+    }
+    
+    #finish {
+        position: absolute;
+        width: 40px;
+        height: 40px;
+        background-color: #f1c40f;
+        border-radius: 50%;
+        bottom: 0;
+        right: 50px;
+        z-index: 10;
+        box-shadow: 0px 0px 10px rgba(241, 196, 15, 0.7);
+        animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+        100% { transform: scale(1); }
+    }
+    
+    #game-over, #level-complete, #level-selection {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+        display: none;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 100;
+    }
+    
+    #game-over h2, #level-complete h2, #level-selection h2 {
+        color: white; font-size: 28px; margin-bottom: 20px;
+    }
+    
+    #game-over p, #level-complete p {
+        color: white; font-size: 18px; margin-bottom: 30px;
+    }
+    
+    .button {
+        padding: 10px 20px; margin: 10px; border: none; border-radius: 5px;
+        background-color: #3498db; color: white; font-size: 16px; cursor: pointer; transition: all 0.3s;
+    }
+    
+    .button:hover { background-color: #2980b9; transform: scale(1.05); }
+    
+    #level-buttons {
+        display: flex; flex-wrap: wrap; justify-content: center; max-width: 300px; margin-bottom: 20px;
+    }
+    
+    .level-button {
+        width: 50px; height: 50px; margin: 5px;
+        display: flex; justify-content: center; align-items: center;
+        background-color: #3498db; color: white; font-size: 20px; border-radius: 5px;
+        cursor: pointer; transition: all 0.3s;
+    }
+    
+    .level-button:hover { background-color: #2980b9; transform: scale(1.1); }
+    .level-button.locked { background-color: #7f8c8d; cursor: not-allowed; }
+    
+    #game-info {
+        position: absolute; top: 10px; left: 10px; z-index: 50;
+        color: white; font-size: 14px;
+        background-color: rgba(0, 0, 0, 0.5);
+        padding: 5px 10px; border-radius: 5px; min-width: 150px;
+    }
+    
+    #player-controls {
+        position: absolute; bottom: 10px; left: 10px; z-index: 50;
+        color: white; font-size: 12px;
+        background-color: rgba(0, 0, 0, 0.5);
+        padding: 5px 10px; border-radius: 5px;
+    }
+    
+    .player-status { display: flex; align-items: center; margin-top: 5px; }
+    .lives-count { margin-left: 10px; font-weight: bold; }
+    .player1-color { color: #e74c3c; }
+    .player2-color { color: #4e8df2; }
+    .player-abilities { margin-top: 10px; font-size: 11px; color: #bdc3c7; }
+    
+    #mobile-controls {
+        position: absolute; bottom: 20px; width: 100%;
+        display: flex; justify-content: space-between; z-index: 50;
+        display: none; 
+    }
+    
+    .direction-controls {
+        position: absolute; bottom: 20px; left: 20px;
+        display: flex; flex-direction: column; align-items: center;
+    }
+    
+    .jump-btn-container {
+        position: absolute; bottom: 20px; right: 20px;
+    }
+    
+    .switch-player-btn {
+        position: absolute; top: 20px; right: 20px;
+        width: 50px; height: 50px; border-radius: 50%;
+        background-color: rgba(0, 0, 0, 0.7);
+        border: 3px solid; color: white;
+        font-size: 16px; font-weight: bold;
+        display: flex; justify-content: center; align-items: center;
+        cursor: pointer; transition: all 0.3s ease;
+        z-index: 100; touch-action: manipulation;
+        box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        animation: pulse 1.5s infinite alternate;
+    }
+    
+    .switch-player-btn:hover { transform: scale(1.1); box-shadow: 0 0 15px rgba(0,0,0,0.7); }
+    
+    .mobile-control-label { font-weight: bold; margin-bottom: 5px; font-size: 14px; }
+    
+    .control-btn {
+        background-color: rgba(0, 0, 0, 0.5);
+        border: 2px solid; border-radius: 10px;
+        width: 50px; height: 50px; font-size: 18px;
+        display: flex; justify-content: center; align-items: center;
+        margin: 5px; cursor: pointer; color: white;
+        touch-action: manipulation; user-select: none;
+        -webkit-user-select: none;
+    }
+    
+    .player1-controls .control-btn, .player1-border { border-color: #e74c3c; }
+    .player2-controls .control-btn, .player2-border { border-color: #4e8df2; }
+    .jump-btn { width: 60px; height: 60px; font-size: 20px; }
+    .direction-controls-inner { display: flex; }
+    
+    @media (max-width: 800px) {
+        #game-container { width: 100%; height: 100vh; border-radius: 0; }
+        #player-controls { display: none; }
+    }
+    
+    @keyframes glow-player1 {
+        0% { box-shadow: 0 0 10px 2px rgba(231, 76, 60, 0.7); }
+        100% { box-shadow: 0 0 20px 5px rgba(231, 76, 60, 0.9); }
+    }
+    
+    @keyframes glow-player2 {
+        0% { box-shadow: 0 0 10px 2px rgba(78, 141, 242, 0.7); }
+        100% { box-shadow: 0 0 20px 5px rgba(78, 141, 242, 0.9); }
+    }
+    
+    @keyframes damageBlink {
+        0% { opacity: 1; }
+        50% { opacity: 0.2; }
+        100% { opacity: 1; }
+    }
+</style>
 </head>
 <body>
-    <div id="game-container">
-        <div id="game-info">
-            <div>关卡: <span id="current-level">1</span></div>
-            <div>时间: <span id="timer">0</span>秒</div>
-            <div class="player-status">
-                <span class="player1-color">玩家1:</span>
-                <span id="player1-status">活跃</span>
-            </div>
-            <div class="player-status">
-                <span class="player2-color">玩家2:</span>
-                <span id="player2-status">活跃</span>
-            </div>
-            <!-- <div class="player-abilities">
-                <div><span class="player1-color">玩家1:</span> 免疫火池，碰水池死亡</div>
-                <div><span class="player2-color">玩家2:</span> 免疫水池，碰火池死亡</div>
-            </div> -->
-        </div>
-        <!-- <div id="player-controls">
-            <div><span class="player1-color">玩家1:</span> W(跳跃), A(左), D(右)</div>
-            <div><span class="player2-color">玩家2:</span> ↑(跳跃), ←(左), →(右)</div>
-        </div> -->
-        
-        <!-- 移动端控制按钮 -->
-        <div id="mobile-controls">
-            <!-- 方向控制按钮 (左侧) -->
-            <div class="direction-controls">
-                <div class="direction-controls-inner">
-                    <button class="control-btn left-btn" id="player-left">←</button>
-                    <button class="control-btn right-btn" id="player-right">→</button>
-                </div>
-            </div>
-            
-            <!-- 跳跃按钮 (右侧) -->
-            <div class="jump-btn-container">
-                <button class="control-btn jump-btn" id="player-jump">跳跃</button>
+<div id="game-container">
+<div id="game-info">
+<div>关卡: <span id="current-level">1</span></div>
+<div>时间: <span id="timer">0</span>秒</div>
+<div class="player-status">
+<span class="player1-color">玩家1:</span>
+<span id="player1-lives" class="lives-count player1-color">❤️❤️❤️</span>
+</div>
+<div class="player-status">
+<span class="player2-color">玩家2:</span>
+<span id="player2-lives" class="lives-count player2-color">❤️❤️❤️</span>
+</div>
+</div>
+<!-- 移动端控制按钮 -->
+    <div id="mobile-controls">
+        <!-- 方向控制按钮 (左侧) -->
+        <div class="direction-controls">
+            <div class="direction-controls-inner">
+                <button class="control-btn left-btn" id="player-left">←</button>
+                <button class="control-btn right-btn" id="player-right">→</button>
             </div>
         </div>
         
-        <!-- 切换玩家按钮（独立于移动控件） -->
-        <div id="switch-player-btn" class="switch-player-btn player1-border">P1</div>
-
-        <div id="player"></div>
-        <div id="player2"></div>
-        <div id="start"></div>
-        <div id="finish"></div>
-        
-        <div id="game-over">
-            <h2>游戏结束</h2>
-            <p id="game-over-text">你撞到了障碍物！</p>
-            <button id="restart-btn" class="button">重新开始</button>
-            <button id="level-select-btn" class="button">选择关卡</button>
-        </div>
-        
-        <div id="level-complete">
-            <h2>关卡完成！</h2>
-            <p id="level-complete-text">恭喜你们完成了关卡！</p>
-            <p>完成时间: <span id="level-time">0</span>秒</p>
-            <p id="winner-text"></p>
-            <button id="next-level-btn" class="button">下一关</button>
-            <button id="level-select-btn-2" class="button">选择关卡</button>
-        </div>
-        
-        <div id="level-selection">
-            <h2>选择关卡</h2>
-            <div id="level-buttons"></div>
-            <button id="main-menu-btn" class="button">主菜单</button>
-            <button id="reset-progress-btn" class="button">重置进度</button>
+        <!-- 跳跃按钮 (右侧) -->
+        <div class="jump-btn-container">
+            <button class="control-btn jump-btn" id="player-jump">跳跃</button>
         </div>
     </div>
     
-    <script src="game.js"></script>
+    <!-- 切换玩家按钮（独立于移动控件） -->
+    <div id="switch-player-btn" class="switch-player-btn player1-border">P1</div>
+
+    <div id="player"></div>
+    <div id="player2"></div>
+    <div id="start"></div>
+    <div id="finish"></div>
+    
+    <div id="game-over">
+        <h2>游戏结束</h2>
+        <p id="game-over-text">你撞到了障碍物！</p>
+        <button id="restart-btn" class="button">重新开始</button>
+        <button id="level-select-btn" class="button">选择关卡</button>
+    </div>
+    
+    <div id="level-complete">
+        <h2>关卡完成！</h2>
+        <p id="level-complete-text">恭喜你们完成了关卡！</p>
+        <p>完成时间: <span id="level-time">0</span>秒</p>
+        <p id="winner-text"></p>
+        <button id="next-level-btn" class="button">下一关</button>
+        <button id="level-select-btn-2" class="button">选择关卡</button>
+    </div>
+    
+    <div id="level-selection">
+        <h2>选择关卡</h2>
+        <div id="level-buttons"></div>
+        <button id="main-menu-btn" class="button">主菜单</button>
+        <button id="reset-progress-btn" class="button">重置进度</button>
+    </div>
+</div>
+
+<script src="game.js"></script>
 </body>
-</html> 
+</html>
