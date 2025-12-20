@@ -2,17 +2,19 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cyber Landscape // Clean</title>
+    <!-- 禁止缩放，确保触控体验 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Cyber Landscape // 赛博山脉</title>
     <style>
         body { 
             margin: 0; 
             overflow: hidden; 
             background-color: #000000; 
+            font-family: monospace;
         }
         canvas { display: block; }
 
-        /* 隐藏视频源，但保留在DOM中供JS读取 */
+        /* 隐藏视频源 */
         #input-video {
             position: absolute;
             top: 0; left: 0;
@@ -20,6 +22,57 @@
             opacity: 0;
             pointer-events: none;
             z-index: -1;
+        }
+
+        /* 启动遮罩层 (解决手机权限和自动播放限制) */
+        #start-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.9); 
+            z-index: 9999;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .intro-text {
+            color: #00fff7;
+            font-size: 14px;
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px rgba(0, 255, 247, 0.5);
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        #start-btn {
+            padding: 15px 40px;
+            border: 1px solid #00fff7;
+            background: rgba(0, 255, 247, 0.1);
+            color: #00fff7;
+            font-size: 16px;
+            letter-spacing: 4px;
+            cursor: pointer;
+            font-family: monospace;
+            box-shadow: 0 0 15px rgba(0, 255, 247, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        #start-btn:active {
+            background: #00fff7;
+            color: #000;
+        }
+
+        /* 状态提示 */
+        #status-msg {
+            position: absolute;
+            bottom: 50px;
+            width: 100%;
+            text-align: center;
+            color: #008888;
+            font-size: 10px;
+            letter-spacing: 1px;
+            pointer-events: none;
+            z-index: 2;
         }
     </style>
 
@@ -33,12 +86,21 @@
 </head>
 <body>
 
-    <video id="input-video" playsinline muted autoplay></video>
+    <!-- 启动界面 -->
+    <div id="start-overlay">
+        <div class="intro-text">赛博山脉 // 交互演示<br>需要访问摄像头</div>
+        <button id="start-btn">点击启动</button>
+    </div>
+
+    <div id="status-msg"></div>
+
+    <!-- 视频元素 (iOS 必须加 playsinline) -->
+    <video id="input-video" playsinline muted autoplay webkit-playsinline></video>
 
     <script>
         // ================= 配置参数 =================
         const CONFIG = {
-            particleCount: 350000, 
+            particleCount: 250000, // 略微降低粒子数以优化手机性能
             rangeX: 120,           
             rangeZ: 140,           
             lineCount: 400,        
@@ -248,7 +310,7 @@
         worldGroup.add(particleSystem);
         scene.add(worldGroup);
 
-        // ================= 4. 控制逻辑 (防抖优化版) =================
+        // ================= 4. 控制逻辑与摄像头初始化 =================
         
         let isHandDetected = false;
         
@@ -260,7 +322,7 @@
         let lastHandDetectedTime = 0;
         let lastKnownHeight = 0.5;
         let lastKnownScale = 1.0;
-        const GRACE_PERIOD = 2000; // 毫秒：丢失手势后，保持最后状态的时间
+        const GRACE_PERIOD = 2000; 
 
         // 当前值 (Lerp)
         let currentTerrainHeight = 0.5;
@@ -268,15 +330,20 @@
         let autoIdleTime = 0;
 
         const videoElement = document.getElementById('input-video');
+        const startBtn = document.getElementById('start-btn');
+        const startOverlay = document.getElementById('start-overlay');
+        const statusMsg = document.getElementById('status-msg');
 
+        // MediaPipe 设置
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
         hands.setOptions({
             maxNumHands: 1,
-            modelComplexity: 0,
+            modelComplexity: 0, // Lite 模型，手机端更快
             minDetectionConfidence: 0.5,
             minTrackingConfidence: 0.5
         });
 
+        // 手势逻辑处理
         hands.onResults((results) => {
             const now = performance.now();
 
@@ -286,16 +353,16 @@
 
                 const hand = results.multiHandLandmarks[0];
 
-                // --- 逻辑 1: 高度控制 (Y轴) ---
-                const y = hand[9].y; 
+                // --- 逻辑 1: 高度控制 (正向逻辑) ---
+                const y = hand[9].y; // 0=顶(高), 1=底(低)
                 
-                // 【优化点 1】映射调整：
-                // 只要 y > 0.95 (靠近底部但还没出去)，就视为完全平原 (Height = 0)
-                // 这样用户不需要把手移出画面就能达到"最平"的效果
-                let safeY = Math.min(y, 0.95); // 截断
-                let normY = safeY / 0.95;      // 归一化 0~1
+                // 优化：只要 y > 0.95 就视为完全平原
+                let safeY = Math.min(y, 0.95); 
+                let normY = safeY / 0.95;      
                 
-                // 手在顶(0) -> Height 大; 手在底(1) -> Height 0
+                // 公式：(1.0 - normY)
+                // 手在顶(normY=0) -> 1.0 -> 乘以系数变成高山
+                // 手在底(normY=1) -> 0.0 -> 平原
                 targetTerrainHeight = (1.0 - normY) * 2.0; 
 
                 // --- 逻辑 2: 缩放 (捏合) ---
@@ -314,11 +381,48 @@
             }
         });
 
-        const cameraUtils = new Camera(videoElement, {
-            onFrame: async () => { await hands.send({image: videoElement}); },
-            width: 320, height: 240
+        // 核心：点击按钮启动摄像头
+        startBtn.addEventListener('click', async () => {
+            startBtn.innerText = "正在连接...";
+            statusMsg.innerText = "正在初始化视觉系统...";
+            
+            try {
+                // 请求前置摄像头，使用 ideal 避免分辨率不支持报错
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: false,
+                    video: {
+                        facingMode: 'user', 
+                        width: { ideal: 320 },
+                        height: { ideal: 240 }
+                    }
+                });
+
+                videoElement.srcObject = stream;
+                
+                // 用户手势触发播放，解决 NotAllowedError
+                await videoElement.play();
+                
+                // 成功后隐藏遮罩
+                startOverlay.style.opacity = 0;
+                setTimeout(() => startOverlay.style.display = 'none', 500);
+                statusMsg.innerText = ""; 
+
+                // 开始 MediaPipe 处理循环
+                processVideo();
+
+            } catch (err) {
+                console.error(err);
+                startBtn.innerText = "重试";
+                statusMsg.innerText = "错误: " + err.message;
+            }
         });
-        cameraUtils.start();
+
+        async function processVideo() {
+            if (videoElement.readyState >= 2) {
+                await hands.send({image: videoElement});
+            }
+            requestAnimationFrame(processVideo);
+        }
 
         // ================= 5. 动画循环 =================
         const clock = new THREE.Clock();
@@ -328,36 +432,26 @@
             const t = clock.getElapsedTime();
             const now = performance.now();
 
-            // 自动模式判断逻辑
+            // 自动模式逻辑 (带防抖)
             if (!isHandDetected) {
-                // 【优化点 2】 防抖机制
-                // 如果手势丢失时间小于容错期 (GRACE_PERIOD)，则保持最后的状态，不进入Auto模式
-                // 防止手放到屏幕底部边缘丢失时突然跳变
                 if (now - lastHandDetectedTime < GRACE_PERIOD) {
                     targetTerrainHeight = lastKnownHeight;
                     targetGlobalScale = lastKnownScale;
                 } else {
-                    // 真的超时了，才进入自动演示
                     autoIdleTime += 0.005;
                     targetTerrainHeight = 0.6 + Math.sin(autoIdleTime) * 0.4;
                     targetGlobalScale = 1.0 + Math.sin(autoIdleTime * 0.7) * 0.1;
                 }
-            } else {
-                // 手势存在时，重置自动计时器，保证平滑切换
-                // 使下次进入自动模式时相位连续（可选，视喜好而定）
-                // autoIdleTime = 0; 
             }
 
-            // 平滑插值 (Lerp)
+            // 平滑插值
             const lerpFactor = 0.08;
             currentTerrainHeight += (targetTerrainHeight - currentTerrainHeight) * lerpFactor;
             currentGlobalScale += (targetGlobalScale - currentGlobalScale) * lerpFactor;
 
-            // 更新 Shader
+            // 更新 Shader 和 场景
             uniforms.uTime.value = t;
             uniforms.uTerrainHeight.value = currentTerrainHeight;
-
-            // 更新 缩放
             worldGroup.scale.set(currentGlobalScale, currentGlobalScale, currentGlobalScale);
             worldGroup.rotation.y = Math.sin(t * 0.05) * 0.05;
 

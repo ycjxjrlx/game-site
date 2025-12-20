@@ -1,67 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 <head>
-<!-- 在 head 里或 body 最上面加入这个样式 -->
-<div id="debug-console" style="position:fixed; top:0; left:0; width:100%; height:50%; background:rgba(0,0,0,0.8); color:#0f0; pointer-events:none; z-index:9999; overflow-y:scroll; font-size:12px; font-family:monospace; padding:10px;">
-    DEBUG LOG STARTED...<br>
-</div>
-
-<script>
-    // ================== 1. 强力调试工具 ==================
-    const debugBox = document.getElementById('debug-console');
-    
-    // 重写 console.log 和 console.error，让它们显示在屏幕上
-    function logToScreen(msg, color = '#0f0') {
-        const div = document.createElement('div');
-        div.style.color = color;
-        div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
-        debugBox.appendChild(div);
-    }
-
-    console.log = function(msg) { logToScreen(msg); };
-    console.error = function(msg) { logToScreen("ERROR: " + JSON.stringify(msg, Object.getOwnPropertyNames(msg)), '#ff0000'); };
-    
-    // 捕获全局未处理的错误
-    window.onerror = function(message, source, lineno, colno, error) {
-        logToScreen(`CRITICAL: ${message} at line ${lineno}`, '#ff0000');
-    };
-    
-    // 捕获 Promise 错误 (MediaPipe 经常在这里挂掉)
-    window.addEventListener('unhandledrejection', function(event) {
-        logToScreen(`PROMISE FAIL: ${event.reason}`, '#ff0000');
-    });
-</script>
-
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>SATURN // CLEAN VISUAL</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
+        body { 
+            margin: 0; 
+            overflow: hidden; 
             background-color: #0b0f19; 
+            font-family: monospace; 
         }
+        canvas { display: block; }
 
-        /* 全息背景纹理 (保留作为环境氛围，如需纯黑可删除此块) */
-        .holographic-bg {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none;
-            opacity: 0.4;
-            background-image: 
-                radial-gradient(circle at 50% 50%, rgba(20, 30, 48, 0) 0%, rgba(0, 0, 0, 0.6) 100%),
-                url('data:image/svg+xml;utf8,<svg width="100%25" height="100%25" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse"><path d="M 100 0 L 0 0 0 100" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/></pattern></defs><rect width="100%25" height="100%25" fill="url(%23grid)" /><path d="M0 600 Q 400 300 800 500 T 1600 400" stroke="rgba(100, 149, 237, 0.1)" fill="none" stroke-width="1.5"/><path d="M0 300 Q 500 100 1200 300" stroke="rgba(100, 149, 237, 0.1)" fill="none" stroke-width="1.5"/><circle cx="300" cy="500" r="200" stroke="rgba(100, 149, 237, 0.05)" fill="none" stroke-dasharray="5,5"/></svg>');
-            z-index: 0;
-        }
-
-        #canvas-container {
-            position: absolute;
-            z-index: 1;
-            width: 100vw;
-            height: 100vh;
-        }
-
-        /* 隐藏摄像头元素但保持在DOM中以便JS读取 */
-        #video-preview {
+        /* 隐藏视频源，但保留在DOM中供JS读取 */
+        #input-video {
             position: absolute;
             top: 0; left: 0;
             width: 1px; height: 1px;
@@ -69,8 +22,60 @@
             pointer-events: none;
             z-index: -1;
         }
+
+        /* 启动遮罩层 (解决手机权限问题) */
+        #start-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(11, 15, 25, 0.95); /* 匹配背景色 */
+            z-index: 9999;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            backdrop-filter: blur(10px);
+            transition: opacity 0.5s ease-out; /* 淡入淡出效果 */
+        }
+
+        .intro-text {
+            color: #8a7045; /* 土星的颜色 */
+            font-size: 14px;
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px rgba(138, 112, 69, 0.3);
+            text-align: center;
+        }
+
+        #start-btn {
+            padding: 15px 40px;
+            border: 1px solid #decba4; /* 土星的金色 */
+            background: rgba(222, 203, 164, 0.1);
+            color: #decba4;
+            font-size: 16px;
+            letter-spacing: 4px;
+            cursor: pointer;
+            font-family: monospace;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 15px rgba(222, 203, 164, 0.3);
+        }
+
+        #start-btn:active {
+            background: #decba4;
+            color: #0b0f19; /* 文字变深 */
+        }
+        
+        /* 状态信息，在启动后隐藏 */
+        #status-msg {
+            position: absolute;
+            bottom: 50px;
+            width: 100%;
+            text-align: center;
+            color: #555; /* 较暗的颜色 */
+            font-size: 10px;
+            letter-spacing: 1px;
+            pointer-events: none;
+            z-index: 2;
+            transition: opacity 0.3s ease-out;
+        }
     </style>
-    
+
     <!-- Three.js & MediaPipe -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -80,10 +85,17 @@
 </head>
 <body>
 
-    <div class="holographic-bg"></div>
+    <!-- 启动遮罩层 -->
+    <div id="start-overlay">
+        <div class="intro-text">全息行星 // 需要摄像头权限</div>
+        <button id="start-btn">点击启动</button>
+    </div>
+
+    <!-- 状态信息，在启动后隐藏 -->
+    <div id="status-msg">等待系统就绪...</div>
     
-    <!-- 视频元素必须存在用于捕捉，但已隐藏 -->
-    <video id="video-preview" playsinline></video>
+    <!-- 视频元素，用于捕捉 -->
+    <video id="input-video" playsinline muted autoplay webkit-playsinline></video>
     
     <div id="canvas-container"></div>
 
@@ -111,7 +123,7 @@
             ring: new THREE.Color(0xe0e6eb)
         };
 
-        // 光源：右前上方
+        // 【保留】光源方向不变
         const lightDir = new THREE.Vector3(1.5, 0.2, 2.0).normalize();
 
         // --- 构建土星 ---
@@ -173,7 +185,7 @@
         group.add(rings);
 
         // ==========================================
-        // PART 2: 核心控制逻辑
+        // PART 2: 交互与逻辑 (修复移动端权限)
         // ==========================================
         
         let targetScale = 0.8;      
@@ -184,40 +196,85 @@
         let isHandDetected = false; 
         let autoIdleTime = 0;       
 
-        // MediaPipe 设置
-        const videoElement = document.getElementById('video-preview');
-        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        const videoElement = document.getElementById('input-video');
+        const startBtn = document.getElementById('start-btn');
+        const startOverlay = document.getElementById('start-overlay');
+        const statusMsg = document.getElementById('status-msg');
 
+        // 1. 初始化 MediaPipe Hands
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
         hands.setOptions({
             maxNumHands: 1,
-            modelComplexity: 1,
-            minDetectionConfidence: 0.6,
-            minTrackingConfidence: 0.6 
+            modelComplexity: 0, // 0 = Lite (手机优化), 1 = Full
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5 
         });
 
         hands.onResults(onResults);
 
-        const cameraUtils = new Camera(videoElement, {
-            onFrame: async () => { await hands.send({image: videoElement}); },
-            width: 320, height: 240
-        });
-        cameraUtils.start();
+        // 2. 点击启动摄像头 (解决 NotAllowedError)
+        startBtn.addEventListener('click', async () => {
+            startBtn.innerText = "正在连接...";
+            statusMsg.innerText = "正在请求摄像头权限...";
+            
+            try {
+                // 使用 ideal 防止分辨率报错
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: false,
+                    video: {
+                        facingMode: 'user', // 强制前置
+                        width: { ideal: 320 },
+                        height: { ideal: 240 }
+                    }
+                });
 
+                videoElement.srcObject = stream;
+                
+                // 关键：用户点击后立即 play
+                await videoElement.play();
+                
+                // 隐藏遮罩
+                startOverlay.style.opacity = 0;
+                setTimeout(() => startOverlay.style.display = 'none', 500);
+                statusMsg.innerText = ""; // 清空提示
+
+                // 启动处理循环
+                processVideo();
+
+            } catch (err) {
+                console.error(err);
+                startBtn.innerText = "重试";
+                statusMsg.innerText = "错误: " + err.message;
+            }
+        });
+
+        async function processVideo() {
+            if (videoElement.readyState >= 2) { // HAVE_CURRENT_DATA
+                await hands.send({image: videoElement});
+            }
+            requestAnimationFrame(processVideo);
+        }
+
+        // 3. 手势处理逻辑 (未反向)
         function onResults(results) {
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 isHandDetected = true;
                 const hand = results.multiHandLandmarks[0];
 
-                // 计算拇指(4)和食指(8)的距离用于缩放
-                const p1 = hand[4];
-                const p2 = hand[8];
+                // 捏合缩放 (不变)
+                const p1 = hand[4]; // 拇指
+                const p2 = hand[8]; // 食指
                 const dist = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
                 
                 const normDist = Math.max(0, Math.min(1, (dist - 0.02) / 0.25));
                 targetScale = 0.3 + normDist * 1.3; 
 
-                // 使用中指根部(9)的Y坐标控制上下旋转
-                const y = hand[9].y;
+                // 上下移动旋转 (未反向)
+                const y = hand[9].y; // 中指根部 Y (0顶 -> 1底)
+                
+                // 正常逻辑: 手抬高(y小) -> 角度小; 手压低(y大) -> 角度大
+                // 映射: y=0.1 (手在非常靠上) -> 0.8 
+                //       y=0.9 (手在非常靠下) -> 0.8 - 1.2 = -0.4 
                 const normY = Math.max(0, Math.min(1, (y - 0.1) / 0.8));
                 targetRotX = 0.8 - normY * 1.2; 
             } else {
@@ -228,7 +285,7 @@
         // ==========================================
         // PART 3: 动画循环
         // ==========================================
-        let time = 0;
+        let time = 0; // 用于控制自动模式下的时间
         
         function animate() {
             requestAnimationFrame(animate);
@@ -237,11 +294,12 @@
             // 自动巡航模式
             if (!isHandDetected) {
                 autoIdleTime += 0.02;
+                // 简单的自动上下浮动和缩放
                 targetScale = 0.8 + Math.sin(autoIdleTime) * 0.1;
                 targetRotX = 0.4 + Math.cos(autoIdleTime * 0.5) * 0.15;
             }
 
-            // 平滑插值
+            // 平滑插值 (Lerp)
             const lerpFactor = 0.08; 
             currentScale += (targetScale - currentScale) * lerpFactor;
             currentRotX += (targetRotX - currentRotX) * lerpFactor;
@@ -249,6 +307,7 @@
             group.scale.set(currentScale, currentScale, currentScale);
             group.rotation.x = currentRotX;
             
+            // 土星的自转和光环自转
             group.rotation.y += 0.001; 
             rings.rotation.y -= 0.0005;
 
@@ -256,6 +315,7 @@
         }
         animate();
 
+        // 窗口大小改变事件
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
